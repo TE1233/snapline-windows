@@ -45,7 +45,7 @@ $arguments = @('/nologo','/target:winexe','/platform:anycpu','/optimize+','/utf8
 & $csc @arguments
 if ($LASTEXITCODE -ne 0) { throw '编译失败。' }
 Copy-Item -LiteralPath (Join-Path $projectRoot 'Snapline.exe.config') -Destination $dist -Force
-foreach ($name in @('使用说明.txt','LICENSE.txt')) {
+foreach ($name in @('使用说明.txt','LICENSE.txt','THIRD_PARTY_NOTICES.md')) {
     if (Test-Path -LiteralPath (Join-Path $projectRoot $name)) { Copy-Item -LiteralPath (Join-Path $projectRoot $name) -Destination $dist -Force }
 }
 Get-Item -LiteralPath (Join-Path $dist 'Snapline.exe') | Select-Object FullName,Length
