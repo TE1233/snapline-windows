@@ -39,5 +39,6 @@ Ctrl+Alt+T：展开并固定 / 收起。
 完全本地运行，不联网、不上传、不修改 Windows 截图设置，不设置开机启动。
 第三方应用粘贴和拖放取决于其支持的格式。本地构建，未做数字签名。
 
-独立 Windows 实现，交互灵感来自 https://github.com/alejandrobujan/tendedero。
+独立 Windows 实现，交互灵感来自 Alejandro Buján 的 Tendedero： https://github.com/alejandrobujan/tendedero。
 使用自行绘制的图标与新的名称。
+原项目源码采用 MIT 许可；其名称、图标和 docs 图片另有使用限制。来源说明见 THIRD_PARTY_NOTICES.md。

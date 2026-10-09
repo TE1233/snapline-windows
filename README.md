@@ -6,7 +6,7 @@
 
 ## 下载
 
-[Windows 便携版 0.5.0](Snapline-Windows-0.5.0-portable.zip) · [源码包 0.5.0](Snapline-Windows-0.5.0-source.zip)
+[Windows 便携版 0.5.0](https://github.com/TE1233/snapline-windows/releases/download/v0.5.0/Snapline-Windows-0.5.0-portable.zip) · [源码包 0.5.0](https://github.com/TE1233/snapline-windows/releases/download/v0.5.0/Snapline-Windows-0.5.0-source.zip)
 
 完整解压便携版后，双击 Snapline.exe 即可运行。
 
@@ -68,4 +68,12 @@ tests/memo-ui.ps1 用 Windows PowerShell -STA 运行，在独立示例目录验�
 
 结果见 tests/store-results.txt、tests/memo-results.txt、tests/integration-results.txt、tests/hotkey-results.txt、tests/selection-results.txt 和 tests/ui-0.5.0-verification.md。
 
-MIT License。灵感项目的许可见 [Tendedero LICENSE](https://github.com/alejandrobujan/tendedero/blob/main/LICENSE)。Ctrl+B 加粗用途见 [Microsoft Word 说明](https://support.microsoft.com/en-us/word/make-the-text-bold)。
+## 来源与致谢
+
+本项目的截图晾衣绳概念及单击复制、双击查看、长按编辑、拖拽分享等交互，参考了 [Alejandro Buján](https://github.com/alejandrobujan) 创作的 [Tendedero](https://github.com/alejandrobujan/tendedero)。原项目是使用 Swift、AppKit 和 SwiftUI 编写的 macOS 应用。
+
+Snapline 是受该项目启发的独立 Windows 实现，使用 C#、WPF 和 .NET Framework 4.8。Windows 框选截图、Ctrl+B 专属收集、三色便签及本地持久化由本仓库实现。发布使用 Snapline / 截图晾台名称、自绘图标和自行生成的示例预览。
+
+Tendedero 的源码采用 MIT 许可证，其名称、图标及 docs 图片有另外的使用限制，详情见 [原项目 LICENSE](https://github.com/alejandrobujan/tendedero/blob/main/LICENSE)。完整来源说明和固定版本参考见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+本仓库 Windows 实现采用 [MIT License](LICENSE.txt)。Ctrl+B 加粗用途见 [Microsoft Word 说明](https://support.microsoft.com/en-us/word/make-the-text-bold)。
