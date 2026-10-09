@@ -8,6 +8,12 @@
 
 [Windows 便携版 0.5.0](https://github.com/TE1233/snapline-windows/releases/download/v0.5.0/Snapline-Windows-0.5.0-portable.zip) · [源码包 0.5.0](https://github.com/TE1233/snapline-windows/releases/download/v0.5.0/Snapline-Windows-0.5.0-source.zip)
 
+GitHub 下载不畅时，可尝试 [备用加速下载 1](https://ghfast.top/https://github.com/TE1233/snapline-windows/releases/download/v0.5.0/Snapline-Windows-0.5.0-portable.zip) · [备用加速下载 2](https://gh-proxy.com/https://github.com/TE1233/snapline-windows/releases/download/v0.5.0/Snapline-Windows-0.5.0-portable.zip)。
+
+这两个入口无需注册，通过第三方服务转发 GitHub 原始发布文件。2026-10-09 已在本机绕过 HTTP 代理下载验证，文件与原包完全一致。服务可用性可能变化；一个入口打不开时可尝试另一个。
+
+便携包 SHA-256：`579d911c005446eb281b26b9fd631f20391ae1ea1c4b8b5b44c082f3cb59e9ce`
+
 完整解压便携版后，双击 Snapline.exe 即可运行。
 
 ![截图和三色便签挂在天空蓝晾衣绳上](notes-preview.png)
