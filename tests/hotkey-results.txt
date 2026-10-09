@@ -1,0 +1,5 @@
+PASS: occupied Ctrl+B is not taken over
+PASS: Ctrl+B registers after competing owner releases it
+PASS: alternative Ctrl+PrtSc persists and registers
+PASS: alternative Shift+PrtSc registers
+PASS: disabled shortcut does not register

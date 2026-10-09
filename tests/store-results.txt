@@ -1,0 +1,8 @@
+﻿PASS: enlarged preview decoding is bounded, source handle released and cached image unchanged
+PASS: legacy clipboard and external-folder collection preferences are disabled
+PASS: old Ctrl+PrtSc default migrates to Ctrl+B once; explicit alternatives remain selectable
+PASS: shortcut selection and disabled state persist; old settings migrate preserving preferences
+PASS: PNG save/load, pixel deduplication, persistence, thumbnails
+PASS: imported source preserved during remove and clear
+PASS: path traversal rejected, settings persisted, extension filtering
+PASS: 60-item retention and cache cleanup

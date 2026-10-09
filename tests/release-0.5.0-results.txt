@@ -1,0 +1,4 @@
+PASS: Portable EXE SHA-256 equals running build
+PASS: Every source archive entry matches current source/documents
+PASS: Source package contains only explicit code, documentation, demo previews and test reports
+PASS: Real app runs 0.5.0 with Ctrl+B registration and no generic clipboard listener

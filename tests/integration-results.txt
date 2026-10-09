@@ -1,0 +1,27 @@
+﻿PASS: Ctrl+Alt+T and Ctrl+B registered; broad clipboard listener is absent
+PASS: external clipboard images are ignored, even with old collection preferences enabled
+PASS: external clipboard image is ignored during an active Ctrl+B session
+PASS: Ctrl+B collects its direct result and copies it, without collecting the competing clipboard image
+PASS: duplicate capture completion is ignored
+PASS: copy exports bitmap for image pasting without adding another card
+PASS: separate copy-file action exports PNG file drop format
+PASS: external screenshot folder files are ignored and preserved, including legacy configured folders
+PASS: editing an existing cached image still refreshes its card
+PASS: cancelled Ctrl+B session preserves clipboard and adds no image
+PASS: images copied after cancellation and late cancelled-session results are ignored
+PASS: mouse capture button copies without automatic collection
+PASS: alternate screenshot shortcut copies without automatic collection; only Ctrl+B collects
+PASS: previous clipboard formats restored
+PASS: WM_HOTKEY collapses shelf to thin top indicator
+PASS: WM_HOTKEY expands shelf without taking keyboard focus
+PASS: unknown hotkey IDs leave shelf unchanged
+PASS: capture hotkey uses separate route, hides shelf before dispatch, launches exactly once
+PASS: tray opening gives mouse travel grace and preserves keyboard focus
+PASS: tray opening auto-collapses when mouse remains outside
+PASS: tray shelf stays open while mouse is inside, beyond the grace period
+PASS: tray shelf auto-collapses after mouse leaves
+PASS: explicit fixed-display choice keeps shelf open with mouse outside
+PASS: unchecking fixed-display restores auto-collapse
+PASS: Ctrl+Alt+T still opens with fixed display
+PASS: tray toggle closes fixed-display shelf
+PASS: second-launch opening also restores automatic collapse

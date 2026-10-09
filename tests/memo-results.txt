@@ -1,0 +1,6 @@
+﻿PASS: Unicode, emoji, multiline text and paper color persist across restart
+PASS: editing preserves creation order, ID and chosen color
+PASS: interrupted saves, additions and deletions preserve existing notes
+PASS: notes survive the 60-image retention limit and clearing screenshots
+PASS: selected-note deletion and oversize-input validation preserve other content
+PASS: unreadable notes file is preserved rather than overwritten

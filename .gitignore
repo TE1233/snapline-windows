@@ -1,0 +1,23 @@
+# Local build output, older packages and temporary QA data
+/dist/
+/source-package/
+/*.zip
+!/Snapline-Windows-0.5.0-portable.zip
+!/Snapline-Windows-0.5.0-source.zip
+/tests/*
+!/tests/verify.ps1
+!/tests/hotkey-conflict.ps1
+!/tests/capture-selection.ps1
+!/tests/memo-ui.ps1
+!/tests/store-results.txt
+!/tests/memo-results.txt
+!/tests/memo-ui-results.txt
+!/tests/integration-results.txt
+!/tests/hotkey-results.txt
+!/tests/selection-results.txt
+!/tests/release-0.5.0-results.txt
+!/tests/ui-0.5.0-verification.md
+*.tmp
+*.log
+.vs/
+.vscode/

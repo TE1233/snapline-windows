@@ -1,0 +1,2 @@
+﻿PASS: New note, Unicode input, paper color and immediate Done save through actual UI controls
+PASS: Delete asks for confirmation; No preserves note; Yes deletes only selected note
