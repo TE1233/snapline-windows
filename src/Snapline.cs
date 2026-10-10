@@ -28,7 +28,7 @@ using Path = System.IO.Path;
 
 [assembly: System.Reflection.AssemblyTitle("Snapline - 截图晾台")]
 [assembly: System.Reflection.AssemblyDescription("Private, local screenshot shelf for Windows")]
-[assembly: System.Reflection.AssemblyVersion("0.5.2.0")]
+[assembly: System.Reflection.AssemblyVersion("0.5.3.0")]
 
 namespace Snapline
 {
@@ -83,6 +83,8 @@ namespace Snapline
         [DataMember] public int CaptureShortcutRevision = 1;
         [DataMember] public uint CustomCaptureModifiers;
         [DataMember] public uint CustomCaptureKey;
+        [DataMember] public bool StartupEnabled;
+        [DataMember] public int StartupRevision;
     }
 
     sealed partial class Store
@@ -285,6 +287,10 @@ namespace Snapline
 
         Forms.NotifyIcon tray;
         Forms.ToolStripMenuItem captureMenu, pinMenu;
+        internal Forms.ToolStripMenuItem startupMenu;
+        internal StartupRegistration Startup;
+        internal bool StartCollapsed;
+        internal bool Expanded { get { return expanded; } }
         readonly Dictionary<string, Forms.ToolStripMenuItem> shortcutChoices = new Dictionary<string, Forms.ToolStripMenuItem>();
         readonly DispatcherTimer captureDelay = new DispatcherTimer();
         ToolTip helpTip, imageTip;
@@ -353,6 +359,11 @@ namespace Snapline
             RegisterCaptureShortcut();
             screen = ScreenUnderPointer();
             MakeTray();
+            if (Startup != null && !StartCollapsed)
+            {
+                string error;
+                if (!Startup.Initialize(out error)) tray.ShowBalloonTip(5000, "开机启动未启用", error, Forms.ToolTipIcon.Warning);
+            }
             store.SaveSettings(); // Persist disabled legacy collection preferences on upgrade.
             captureDelay.Interval = TimeSpan.FromMilliseconds(80);
             captureDelay.Tick += CaptureWhenReleased;
@@ -364,20 +375,26 @@ namespace Snapline
             tick.Tick += Tick;
             tick.Start();
             if (demo) { pinned = true; Reveal(); }
+            else if (StartCollapsed) { Render(); }
             else
             {
                 Reveal();
                 keepUntil = DateTime.Now.AddSeconds(7);
                 if (!store.Settings.WelcomeShown)
                 {
-                    tray.ShowBalloonTip(4500, "截图晾台已启动", CaptureShortcutLabel + " 框选截图。图片右侧「操作提示」卡片可查看说明。", Forms.ToolTipIcon.Info);
+                    tray.ShowBalloonTip(4500, "截图晾台已启动", CaptureShortcutLabel + " 框选截图。图片右侧「操作提示」卡片可查看说明。开机启动可在托盘开关。", Forms.ToolTipIcon.Info);
                     store.Settings.WelcomeShown = true;
                     store.SaveSettings();
                 }
             }
 
-            if (store.Settings.CaptureShortcut != "None" && !CaptureHotkeyRegistered) Notify(CaptureShortcutLabel + " 已被占用，可点击剪刀截图或在托盘更换快捷键。");
-            if (!HotkeyRegistered) Notify("Ctrl + Alt + T 已被其他程序占用，可用顶部悬停或托盘展开。");
+            if (store.Settings.CaptureShortcut != "None" && !CaptureHotkeyRegistered) StartupNotice(CaptureShortcutLabel + " 已被占用，可点击剪刀截图或在托盘更换快捷键。");
+            if (!HotkeyRegistered) StartupNotice("Ctrl + Alt + T 已被其他程序占用，可用顶部悬停或托盘展开。");
+        }
+        void StartupNotice(string message)
+        {
+            if (StartCollapsed) tray.ShowBalloonTip(5000, "截图晾台", message, Forms.ToolTipIcon.Warning);
+            else Notify(message);
         }
         IntPtr Message(IntPtr h, int msg, IntPtr w, IntPtr l, ref bool handled)
         {
@@ -675,6 +692,14 @@ namespace Snapline
                 }
                 finally { dialogOpen = false; }
             });
+            startupMenu = new Forms.ToolStripMenuItem("开机启动", null, delegate
+            {
+                string error;
+                if (Startup != null && !Startup.Apply(!store.Settings.StartupEnabled, out error)) Notify(error);
+                startupMenu.Checked = store.Settings.StartupEnabled;
+            }) { Enabled = Startup != null };
+            menu.Items.Add(startupMenu);
+            menu.Opening += delegate { startupMenu.Checked = Startup != null && store.Settings.StartupEnabled; };
             menu.Items.Add("使用说明", null, delegate { About(); });
             menu.Items.Add(new Forms.ToolStripSeparator());
             menu.Items.Add("退出", null, delegate { Close(); });
@@ -687,7 +712,7 @@ namespace Snapline
             dialogOpen = true;
             try
             {
-                Forms.MessageBox.Show("截图晾台 Snapline 0.5.2\n\n" + CaptureShortcutLabel + "：框选截图（需快捷键可用）。\n图片右侧「操作提示」：悬停查看说明，点击内部按钮仅截图并复制。\nWin + Shift + S 和其他软件截图不会自动加入。\nCtrl + Alt + T：展开 / 收起，展开后保持显示。\n双击托盘图标：临时展开，离开后自动收起。\n托盘「固定显示」：勾选保持显示，取消后恢复自动收起。\n鼠标停在屏幕顶部：临时展开。\n单击图片：复制。双击：查看。\n拖出：复制为文件。按 Shift 拖到文件夹：移动。\n长按图片：用画图编辑。右键：更多操作。\n\n默认 Ctrl+B 或自定义快捷键发起的框选截图会自动加入。微信截图、普通复制图片和外部截图文件夹均不自动收集。\n最多保留 60 张，超过后清理最早的应用副本。\n完全本地运行，不联网、不上传、不修改系统截图设置。", "截图晾台", Forms.MessageBoxButtons.OK, Forms.MessageBoxIcon.Information);
+                Forms.MessageBox.Show("截图晾台 Snapline 0.5.3\n\n" + CaptureShortcutLabel + "：框选截图（需快捷键可用）。\n图片右侧「操作提示」：悬停查看说明，点击内部按钮仅截图并复制。\nWin + Shift + S 和其他软件截图不会自动加入。\nCtrl + Alt + T：展开 / 收起，展开后保持显示。\n双击托盘图标：临时展开，离开后自动收起。\n托盘「固定显示」：勾选保持显示，取消后恢复自动收起。\n托盘「开机启动」：首次运行自动启用，取消后记住；登录 Windows 后收起运行。\n鼠标停在屏幕顶部：临时展开。\n单击图片：复制。双击：查看。\n拖出：复制为文件。按 Shift 拖到文件夹：移动。\n长按图片：用画图编辑。右键：更多操作。\n\n默认 Ctrl+B 或自定义快捷键发起的框选截图会自动加入。微信截图、普通复制图片和外部截图文件夹均不自动收集。\n最多保留 60 张，超过后清理最早的应用副本。\n完全本地运行，不联网、不上传、不修改系统截图设置。", "截图晾台", Forms.MessageBoxButtons.OK, Forms.MessageBoxIcon.Information);
             }
             finally { dialogOpen = false; }
         }
@@ -1230,10 +1255,11 @@ namespace Snapline
                 if (args.Contains("--memo-test")) return MemoTests.Run(root);
                 if (args.Contains("--shortcut-test")) return ShortcutTests.Run(root);
                 if (args.Contains("--hover-test")) return HoverTests.Run(root);
+                if (args.Contains("--startup-test")) return StartupTests.Run(root);
                 bool fresh;
                 using (var mutex = new Mutex(true, "Local\\Snapline-" + BitConverter.ToString(SHA256.Create().ComputeHash(Encoding.UTF8.GetBytes(Path.GetFullPath(root)))).Replace("-", "").Substring(0, 20), out fresh))
                 {
-                    if (!fresh) { Native.PostMessage(new IntPtr(0xffff), Native.ShowMessage, IntPtr.Zero, IntPtr.Zero); return 0; }
+                    if (!fresh) { if (!args.Contains("--startup")) Native.PostMessage(new IntPtr(0xffff), Native.ShowMessage, IntPtr.Zero, IntPtr.Zero); return 0; }
                     var store = new Store(root);
                     var app = new Application { ShutdownMode = ShutdownMode.OnMainWindowClose };
                     app.DispatcherUnhandledException += delegate(object sender, DispatcherUnhandledExceptionEventArgs e)
@@ -1255,6 +1281,9 @@ namespace Snapline
                         store.AddNote("一个小灵感\\n把想到的事情写下来，\\n让它像照片一样晾着。".Replace("\\n", "\n"), "Lavender");
                     }
                     var shelf = new Shelf(store, args.Contains("--no-capture"), demo);
+                    shelf.StartCollapsed = args.Contains("--startup");
+                    if (StartupRegistration.ManagesSystemStartup(args))
+                        shelf.Startup = new StartupRegistration(store, new RegistryStartupEntry(), System.Reflection.Assembly.GetExecutingAssembly().Location);
                     app.MainWindow = shelf;
                     var quit = new DispatcherTimer();
                     string seconds = Option(args, "--quit-after");
@@ -1268,7 +1297,7 @@ namespace Snapline
                         {
                             delay.Stop();
                             if (snapshot != null) shelf.Snapshot(snapshot);
-                            if (diagnostics != null) System.IO.File.WriteAllText(diagnostics, "collectionMode=ConfiguredShortcutOnly" + Environment.NewLine + "captureUi=BuiltinRegion" + Environment.NewLine + "clipboardListener=" + shelf.ClipboardRegistered + Environment.NewLine + "hotkey=" + shelf.HotkeyRegistered + Environment.NewLine + "captureHotkey=" + shelf.CaptureHotkeyRegistered + Environment.NewLine + "captureShortcut=" + shelf.CaptureShortcutLabel + Environment.NewLine + "items=" + store.Items.Count + Environment.NewLine + "notes=" + store.Notes.Count + Environment.NewLine + "windowHandle=" + new WindowInteropHelper(shelf).Handle.ToInt64() + Environment.NewLine);
+                            if (diagnostics != null) System.IO.File.WriteAllText(diagnostics, "collectionMode=ConfiguredShortcutOnly" + Environment.NewLine + "captureUi=BuiltinRegion" + Environment.NewLine + "clipboardListener=" + shelf.ClipboardRegistered + Environment.NewLine + "hotkey=" + shelf.HotkeyRegistered + Environment.NewLine + "captureHotkey=" + shelf.CaptureHotkeyRegistered + Environment.NewLine + "captureShortcut=" + shelf.CaptureShortcutLabel + Environment.NewLine + "items=" + store.Items.Count + Environment.NewLine + "notes=" + store.Notes.Count + Environment.NewLine + "expanded=" + shelf.Expanded + Environment.NewLine + "startupManaged=" + (shelf.Startup != null) + Environment.NewLine + "startupEnabled=" + store.Settings.StartupEnabled + Environment.NewLine + "windowHandle=" + new WindowInteropHelper(shelf).Handle.ToInt64() + Environment.NewLine);
                         };
                         delay.Start();
                     };

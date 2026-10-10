@@ -1,5 +1,7 @@
 ﻿# 截图晾台 Snapline — Windows 版
 
+0.5.3 新增开机启动：首次正常运行（包括旧版升级）自动为当前 Windows 用户启用，下次登录后收起运行。托盘「开机启动」可取消并记住选择。保留下述顶部蓝线展开修复。
+
 0.5.2 修复顶部蓝线偶尔不展开：Windows 桌面与普通最大化窗口不再被误判为全屏，扩大蓝线附近的触发范围并容忍轻微鼠标抖动，停留约 0.2 秒展开。
 
 0.5.1 新增自定义截图快捷键：右键托盘图标 → 截图快捷键 → 自定义，直接按下组合键后保存。支持 Ctrl、Shift、Alt 组合，保存时检查全局占用，重启后保留选择，操作提示同步显示。
@@ -10,13 +12,13 @@
 
 ## 下载
 
-[Windows 便携版 0.5.2](https://github.com/TE1233/snapline-windows/releases/download/v0.5.2/Snapline-Windows-0.5.2-portable.zip) · [源码包 0.5.2](https://github.com/TE1233/snapline-windows/releases/download/v0.5.2/Snapline-Windows-0.5.2-source.zip)
+[Windows 便携版 0.5.3](https://github.com/TE1233/snapline-windows/releases/download/v0.5.3/Snapline-Windows-0.5.3-portable.zip) · [源码包 0.5.3](https://github.com/TE1233/snapline-windows/releases/download/v0.5.3/Snapline-Windows-0.5.3-source.zip)
 
-GitHub 下载不畅时，可尝试 [备用加速下载 1](https://ghfast.top/https://github.com/TE1233/snapline-windows/releases/download/v0.5.2/Snapline-Windows-0.5.2-portable.zip) · [备用加速下载 2](https://gh-proxy.com/https://github.com/TE1233/snapline-windows/releases/download/v0.5.2/Snapline-Windows-0.5.2-portable.zip)。
+GitHub 下载不畅时，可尝试 [备用加速下载 1](https://ghfast.top/https://github.com/TE1233/snapline-windows/releases/download/v0.5.3/Snapline-Windows-0.5.3-portable.zip) · [备用加速下载 2](https://gh-proxy.com/https://github.com/TE1233/snapline-windows/releases/download/v0.5.3/Snapline-Windows-0.5.3-portable.zip)。
 
 这两个入口无需注册，通过第三方服务转发 GitHub 原始发布文件。服务可用性可能变化；一个入口打不开时可尝试另一个。
 
-便携包 SHA-256：`4912941c120cee155eed7768d69cdb053f3a4e12a5d336056810a4937a37d87e`
+便携包 SHA-256：`d2fc362fa3cef42daf2f39298a736287b040acfc2a41cf785b60e9086672683e`
 
 完整解压便携版后，双击 Snapline.exe 即可运行。
 
@@ -24,7 +26,7 @@ GitHub 下载不畅时，可尝试 [备用加速下载 1](https://ghfast.top/htt
 
 ## 使用
 
-运行 dist/Snapline.exe。ZIP 请先完整解压，保留同目录的 Snapline.exe.config。已在本机 Windows 10（10.0.19045）验证，目标为 Windows 10/11 和 .NET Framework 4.8。程序约 130 KB，使用系统运行库，无需另装开发工具。
+运行 dist/Snapline.exe。ZIP 请先完整解压，保留同目录的 Snapline.exe.config。已在本机 Windows 10（10.0.19045）验证，目标为 Windows 10/11 和 .NET Framework 4.8。程序约 140 KB，使用系统运行库，无需另装开发工具。
 
 | 操作 | 效果 |
 | --- | --- |
@@ -36,6 +38,7 @@ GitHub 下载不畅时，可尝试 [备用加速下载 1](https://ghfast.top/htt
 | 挂在图片右边的「操作提示」 | 悬停弹出说明 |
 | 鼠标在顶部蓝线附近停留约 0.2 秒 | 临时展开，离开约 0.7 秒收起 |
 | 双击托盘图标或托盘「展开 / 收起」 | 临时展开，预留 3 秒供鼠标移入晾台 |
+| 托盘「开机启动」 | 首次运行自动启用；可取消，之后保持关闭；登录时收起运行 |
 | 托盘「固定显示」 | 勾选保持显示，取消恢复自动收起 |
 | Ctrl+Alt+T | 展开并固定显示 / 收起 |
 | 悬停截图卡片 | 下方显示放大预览，保持原比例，移开关闭 |
@@ -66,12 +69,15 @@ Ctrl+B 也常用于软件的加粗功能；本程序运行时优先响应截图�
 - 数据位于 %LOCALAPPDATA%/Snapline，便签独立保存在 notes.json。升级保留已有图片、便签与其他设置，错误详情写入 error.log。
 - 便签没有 60 张截图的数量限制，清空截图不删除便签。刚新建的空白便签关闭后会丢弃；每张最多支持 20000 个字符。
 - 保存失败时编辑窗口保留当前文字并提示重试；原便签文件无法读取时会保留文件，避免覆盖原记录。
-- 没有设置开机启动，没有修改 Windows 截图设置。再次运行同一 EXE 会临时展开或收起已有进程。
+- 首次正常运行自动注册当前用户的开机启动，无需管理员权限。右键托盘图标 →「开机启动」取消勾选后会记住关闭状态，重新打开仍保持关闭。首次升级到支持该功能的版本也会启用一次。
+- 登录 Windows 后后台运行并保持收起，不抢焦点；重复的登录启动不会展开已有进程。手动再次运行同一 EXE 会临时展开或收起已有进程。
+- 便携版请完整解压到准备长期保留的目录。移动程序后手动运行一次，会更新已启用的启动路径；删除程序前可先取消「开机启动」。使用当前用户 Run 项，仅修改 Snapline 自身条目，不修改 Windows 截图设置。Windows 可能延后启动，详见 [Microsoft 说明](https://learn.microsoft.com/en-us/windows/win32/setupapi/run-and-runonce-registry-keys)。
+- 测试、演示及自定义数据目录运行不配置系统启动项；注册或保存失败会提示，保存失败时恢复原启动项与设置。
 - 顶部悬停使用桌面物理坐标，已对 100%–300% 缩放、多屏负坐标、顶部任务栏及鼠标抖动做逻辑验证；实际悬停在本机显示器验证。多屏及混合 DPI 的其他电脑需实际使用确认，本轮实际截图仅在当前显示器验证。第三方应用的粘贴、拖放取决于对方支持的格式。
 
 ## 编译和验证
 
-用 PowerShell 运行 build.ps1，调用 Windows 自带 .NET Framework 编译器，输出至 dist。源码为 src/Snapline.cs、src/RegionCapture.cs、src/Memo.cs、src/Shortcut.cs、src/ShortcutEditor.cs、src/Hover.cs 和 src/Integration.cs。本地构建，未做数字签名。
+用 PowerShell 运行 build.ps1，调用 Windows 自带 .NET Framework 编译器，输出至 dist。源码为 src/Snapline.cs、src/RegionCapture.cs、src/Memo.cs、src/Shortcut.cs、src/ShortcutEditor.cs、src/Hover.cs、src/Startup.cs 和 src/Integration.cs。本地构建，未做数字签名。
 
 tests/verify.ps1 验证便签持久化与保存失败处理、自定义快捷键录入、占用和保存失败回退、取消与重启恢复、截图存储、来源筛选、剪贴板输出格式、取消及过期结果、缓存编辑、自动收起、固定显示和快捷键占用。运行前退出本程序以释放全局快捷键。
 
@@ -79,7 +85,7 @@ tests/capture-selection.ps1 用 Windows PowerShell 的 STA 模式运行，验证
 
 tests/memo-ui.ps1 用 Windows PowerShell -STA 运行，在独立示例目录验证新建、纸色、完成保存及删除确认。测试短暂移动鼠标，结束时恢复位置；不写入剪贴板。
 
-结果见 tests/store-results.txt、tests/memo-results.txt、tests/integration-results.txt、tests/hotkey-results.txt、tests/selection-results.txt 和 tests/ui-0.5.0-verification.md；自定义快捷键及 0.5.1 验证见 tests/shortcut-results.txt、tests/release-0.5.1-results.txt。0.5.2 顶部悬停验证见 tests/hover-results.txt 和 tests/release-0.5.2-results.txt。
+结果见 tests/store-results.txt、tests/memo-results.txt、tests/integration-results.txt、tests/hotkey-results.txt、tests/selection-results.txt 和 tests/ui-0.5.0-verification.md；自定义快捷键及 0.5.1 验证见 tests/shortcut-results.txt、tests/release-0.5.1-results.txt。0.5.2 顶部悬停验证见 tests/hover-results.txt 和 tests/release-0.5.2-results.txt。0.5.3 开机启动验证见 tests/startup-results.txt 和 tests/release-0.5.3-results.txt；已验证注册、关闭后重启恢复、移动路径、失败回退和收起启动，未为此重启整台电脑。
 
 ## 来源与致谢
 

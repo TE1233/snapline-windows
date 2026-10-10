@@ -1,0 +1,14 @@
+﻿Snapline Windows 0.5.3 verification - 2026-10-10
+PASS: complete store, memo, integration, custom shortcut, hover and hotkey conflict regression suite
+PASS: first normal launch and old settings migration enable current-user login startup, with a quoted Unicode/space path and --startup
+PASS: disabling survives restart; only Snapline's named entry is removed; explicitly reenable and update moved EXE path
+PASS: settings save failure restores startup registration and preference; registry denial preserves previous preference
+PASS: test/demo/custom-data runs cannot configure real system startup; overlong startup commands report failure
+PASS: real WPF login mode stays collapsed and the tray startup toggle updates registry and persisted settings
+PASS: local 0.5.3 normal launch creates the exact installed EXE startup command in HKCU Run
+PASS: local 0.5.3 login-mode launch shows a 4-pixel indicator and keeps foreground keyboard focus
+PASS: duplicate --startup launch exits without expanding the existing shelf
+PASS: user's screenshots/notes hashes and all existing settings unchanged; only StartupEnabled and StartupRevision were added
+PASS: desktop/maximized hover, fullscreen suppression, scaled geometry/jitter, actual cursor activation and automatic collapse remain valid
+PASS: portable archive contains exactly the installed executable/config/usage/license/attribution files with matching bytes
+LIMIT: Windows login invocation was simulated with --startup; this test did not reboot the computer

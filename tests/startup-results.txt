@@ -1,0 +1,6 @@
+﻿PASS: first normal launch/legacy migration, quoted Unicode and space path, own HKCU registration, existing notes/images/shortcut preserved
+PASS: disabling survives restart and removes only Snapline's named entry
+PASS: explicit reenable and normal launch after portable EXE relocation refresh registration
+PASS: settings save failure rolls back registration; registry denial preserves previous preference
+PASS: test/demo/custom-data runs cannot configure system startup; overlong paths report failure
+PASS: real WPF login launch stays collapsed; tray startup toggle disables and reenables persisted registration

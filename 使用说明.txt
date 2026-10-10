@@ -1,4 +1,4 @@
-﻿截图晾台 Snapline 0.5.2 — Windows 版
+﻿截图晾台 Snapline 0.5.3 — Windows 版
 
 双击 Snapline.exe 启动，保留同目录的 Snapline.exe.config。
 需要系统 .NET Framework 4.8，无需安装开发工具。
@@ -42,7 +42,12 @@ Ctrl+Alt+T：展开并固定 / 收起。
 编辑已有缓存图片仍会更新卡片。
 截图最多保留 60 张，移除或清空截图只删除应用副本，保留原文件，不删除便签。
 数据：%LOCALAPPDATA%\Snapline；便签文件为其中的 notes.json。错误日志：该目录下的 error.log。
-完全本地运行，不联网、不上传、不修改 Windows 截图设置，不设置开机启动。
+首次正常运行（含旧版升级）会自动启用开机启动，登录 Windows 后后台收起运行。
+右键托盘图标 →「开机启动」：取消勾选后会记住关闭状态，下次打开不会自动恢复。
+只为当前 Windows 用户设置，无需管理员权限，不修改其他软件启动项。
+请完整解压到长期保留的目录；移动程序后手动运行一次会更新已启用的启动路径。
+删除程序前可先取消开机启动。Windows 可能延后启动。
+完全本地运行，不联网、不上传、不修改 Windows 截图设置。
 第三方应用粘贴和拖放取决于其支持的格式。本地构建，未做数字签名。
 
 独立 Windows 实现，交互灵感来自 Alejandro Buján 的 Tendedero： https://github.com/alejandrobujan/tendedero。
