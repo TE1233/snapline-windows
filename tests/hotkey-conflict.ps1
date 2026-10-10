@@ -1,6 +1,7 @@
-﻿$ErrorActionPreference = 'Stop'
+﻿param([string]$BinaryPath)
+$ErrorActionPreference = 'Stop'
 $taskProject = Split-Path -Parent $PSScriptRoot
-$taskBinary = Join-Path $taskProject 'dist\Snapline.exe'
+$taskBinary = if ($BinaryPath) { $BinaryPath } else { Join-Path $taskProject 'dist\Snapline.exe' }
 Add-Type -TypeDefinition @"
 using System; using System.Runtime.InteropServices;
 public static class SnaplineHotkeyConflict {

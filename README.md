@@ -1,18 +1,20 @@
 ﻿# 截图晾台 Snapline — Windows 版
 
-0.5.0 新增悬挂便签，提供暖黄、薄荷绿、淡紫三种纸色，自动保存到本机，重启后恢复。仍然只自动收集 Ctrl+B 发起的截图。使用晾台自己的框选界面，结果直接挂上天空蓝晾衣绳；微信截图、Windows 截图、普通复制图片及其他软件保存的截图文件均不会自动加入。
+0.5.1 新增自定义截图快捷键：右键托盘图标 → 截图快捷键 → 自定义，直接按下组合键后保存。支持 Ctrl、Shift、Alt 组合，保存时检查全局占用，重启后保留选择，操作提示同步显示。
+
+0.5.0 新增悬挂便签，提供暖黄、薄荷绿、淡紫三种纸色，自动保存到本机，重启后恢复。默认 Ctrl+B 或当前自定义快捷键发起的晾台截图会自动加入。使用晾台自己的框选界面，结果直接挂上天空蓝晾衣绳；微信截图、Windows 截图、普通复制图片及其他软件保存的截图文件均不会自动加入。
 
 独立 Windows 实现，交互灵感来自 [Tendedero](https://github.com/alejandrobujan/tendedero)。使用自行绘制的图标和新的名称。完全本地运行，不联网、不上传。
 
 ## 下载
 
-[Windows 便携版 0.5.0](https://github.com/TE1233/snapline-windows/releases/download/v0.5.0/Snapline-Windows-0.5.0-portable.zip) · [源码包 0.5.0](https://github.com/TE1233/snapline-windows/releases/download/v0.5.0/Snapline-Windows-0.5.0-source.zip)
+[Windows 便携版 0.5.1](https://github.com/TE1233/snapline-windows/releases/download/v0.5.1/Snapline-Windows-0.5.1-portable.zip) · [源码包 0.5.1](https://github.com/TE1233/snapline-windows/releases/download/v0.5.1/Snapline-Windows-0.5.1-source.zip)
 
-GitHub 下载不畅时，可尝试 [备用加速下载 1](https://ghfast.top/https://github.com/TE1233/snapline-windows/releases/download/v0.5.0/Snapline-Windows-0.5.0-portable.zip) · [备用加速下载 2](https://gh-proxy.com/https://github.com/TE1233/snapline-windows/releases/download/v0.5.0/Snapline-Windows-0.5.0-portable.zip)。
+GitHub 下载不畅时，可尝试 [备用加速下载 1](https://ghfast.top/https://github.com/TE1233/snapline-windows/releases/download/v0.5.1/Snapline-Windows-0.5.1-portable.zip) · [备用加速下载 2](https://gh-proxy.com/https://github.com/TE1233/snapline-windows/releases/download/v0.5.1/Snapline-Windows-0.5.1-portable.zip)。
 
-这两个入口无需注册，通过第三方服务转发 GitHub 原始发布文件。2026-10-09 已在本机绕过 HTTP 代理下载验证，文件与原包完全一致。服务可用性可能变化；一个入口打不开时可尝试另一个。
+这两个入口无需注册，通过第三方服务转发 GitHub 原始发布文件。服务可用性可能变化；一个入口打不开时可尝试另一个。
 
-便携包 SHA-256：`579d911c005446eb281b26b9fd631f20391ae1ea1c4b8b5b44c082f3cb59e9ce`
+便携包 SHA-256：`5c9592a689ac92055afbd5bf5b8d660f26ef14d77ed332fba374f98849d9b7a1`
 
 完整解压便携版后，双击 Snapline.exe 即可运行。
 
@@ -20,11 +22,12 @@ GitHub 下载不畅时，可尝试 [备用加速下载 1](https://ghfast.top/htt
 
 ## 使用
 
-运行 dist/Snapline.exe。ZIP 请先完整解压，保留同目录的 Snapline.exe.config。已在本机 Windows 10（10.0.19045）验证，目标为 Windows 10/11 和 .NET Framework 4.8。程序约 106 KB，使用系统运行库，无需另装开发工具。
+运行 dist/Snapline.exe。ZIP 请先完整解压，保留同目录的 Snapline.exe.config。已在本机 Windows 10（10.0.19045）验证，目标为 Windows 10/11 和 .NET Framework 4.8。程序约 122 KB，使用系统运行库，无需另装开发工具。
 
 | 操作 | 效果 |
 | --- | --- |
-| Ctrl+B | 拖动框选，松开鼠标后自动挂上晾台并复制图片 |
+| Ctrl+B（默认）或已保存的自定义快捷键 | 拖动框选，松开鼠标后自动挂上晾台并复制图片 |
+| 托盘「截图快捷键 → 自定义…」 | 按下组合键，保存并启用；重启后仍有效 |
 | 框选时 Esc 或右键 | 取消，不添加图片，也不改动剪贴板 |
 | 「操作提示」卡片里的截图按钮、托盘截图菜单 | 只截图并复制，不自动挂上晾台 |
 | 微信截图、Win+Shift+S、普通复制图片 | 可以照常使用，不自动加入晾台 |
@@ -45,7 +48,9 @@ GitHub 下载不畅时，可尝试 [备用加速下载 1](https://ghfast.top/htt
 | 悬停便签 | 展示全文，长内容可滚动查看；移开关闭 |
 | 右键便签 | 编辑、复制文字、删除；删除前会确认 |
 
-Ctrl+B 也常用于软件的加粗功能；本程序运行时优先响应截图。可在托盘「截图快捷键」关闭。备选 Ctrl+PrtSc、Shift+PrtSc 仅截图并复制，不自动加入；恢复 Ctrl+B 后才自动收集。已注册的全局热键被占用时会提示，不接管。
+Ctrl+B 也常用于软件的加粗功能；本程序运行时优先响应截图。可在托盘「截图快捷键」关闭。预设的 Ctrl+PrtSc、Shift+PrtSc 仍仅截图并复制，不自动加入；Ctrl+B 和自定义组合会自动收集。自定义支持 Ctrl、Shift、Alt 加字母、数字、符号、功能键或 PrtSc，支持两键组合；不接受单独字符、Win 组合、F12 及晾台的展开快捷键。已注册的全局热键被占用时会提示，不接管；换键或保存失败时保留原设置。常用软件快捷键会提醒，但软件内部快捷键的冲突无法自动全面检测。
+
+![自定义截图快捷键窗口](shortcut-preview.png)
 
 截图界面以开始框选时的桌面像素为底图；只保存选中的区域，遮罩、边框和说明不进入截图。最小区域 2×2 像素，支持反向拖动。取消后不会保留等待下一张剪贴板图片的状态。
 
@@ -64,15 +69,15 @@ Ctrl+B 也常用于软件的加粗功能；本程序运行时优先响应截图�
 
 ## 编译和验证
 
-用 PowerShell 运行 build.ps1，调用 Windows 自带 .NET Framework 编译器，输出至 dist。源码为 src/Snapline.cs、src/RegionCapture.cs、src/Memo.cs 和 src/Integration.cs。本地构建，未做数字签名。
+用 PowerShell 运行 build.ps1，调用 Windows 自带 .NET Framework 编译器，输出至 dist。源码为 src/Snapline.cs、src/RegionCapture.cs、src/Memo.cs、src/Shortcut.cs、src/ShortcutEditor.cs 和 src/Integration.cs。本地构建，未做数字签名。
 
-tests/verify.ps1 验证便签持久化与保存失败处理、截图存储、来源筛选、剪贴板输出格式、取消及过期结果、缓存编辑、自动收起、固定显示和快捷键占用。运行前退出本程序以释放全局快捷键。
+tests/verify.ps1 验证便签持久化与保存失败处理、自定义快捷键录入、占用和保存失败回退、取消与重启恢复、截图存储、来源筛选、剪贴板输出格式、取消及过期结果、缓存编辑、自动收起、固定显示和快捷键占用。运行前退出本程序以释放全局快捷键。
 
-tests/capture-selection.ps1 用 Windows PowerShell 的 STA 模式运行，验证真实 Ctrl+B、框选像素、Esc 与右键取消。它只保存自建示例窗口的截图。测试期间不要进行复制粘贴和鼠标操作；测试会短暂移动鼠标、写入示例剪贴板内容，结束时恢复原内容；若检测到用户之后复制了新内容则保留新内容。
+tests/capture-selection.ps1 用 Windows PowerShell 的 STA 模式运行，验证真实 Ctrl+B、框选像素、Esc 与右键取消。它只保存自建示例窗口的截图。测试期间不要进行复制粘贴和鼠标操作；测试会短暂移动鼠标、写入示例剪贴板内容，结束时恢复原内容；若检测到用户之后复制了新内容则保留新内容。加 -CustomShortcut 可验证两键 Ctrl+F11、自定义触发键松开等待和实际框选。
 
 tests/memo-ui.ps1 用 Windows PowerShell -STA 运行，在独立示例目录验证新建、纸色、完成保存及删除确认。测试短暂移动鼠标，结束时恢复位置；不写入剪贴板。
 
-结果见 tests/store-results.txt、tests/memo-results.txt、tests/integration-results.txt、tests/hotkey-results.txt、tests/selection-results.txt 和 tests/ui-0.5.0-verification.md。
+结果见 tests/store-results.txt、tests/memo-results.txt、tests/integration-results.txt、tests/hotkey-results.txt、tests/selection-results.txt 和 tests/ui-0.5.0-verification.md；自定义快捷键及 0.5.1 验证见 tests/shortcut-results.txt、tests/release-0.5.1-results.txt。
 
 ## 来源与致谢
 

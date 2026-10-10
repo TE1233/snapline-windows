@@ -1,4 +1,5 @@
-﻿$ErrorActionPreference='Stop'
+﻿param([string]$BinaryPath,[switch]$CustomShortcut)
+$ErrorActionPreference='Stop'
 Add-Type -TypeDefinition @"
 using System;using System.Runtime.InteropServices;using System.Text;
 public static class SnaplineSelectionQA {
@@ -21,6 +22,9 @@ public static class SnaplineSelectionQA {
 $priorDpi=[SnaplineSelectionQA]::SetThreadDpiAwarenessContext([IntPtr]::new(-4))
 Add-Type -AssemblyName System.Windows.Forms,System.Drawing,PresentationCore,PresentationFramework,WindowsBase
 $projectRoot=Split-Path -Parent $PSScriptRoot
+$binary=if($BinaryPath){$BinaryPath}else{Join-Path $projectRoot 'dist\Snapline.exe'}
+$captureKey=if($CustomShortcut){0x7A}else{0x42}
+$captureLabel=if($CustomShortcut){'Ctrl+F11 (custom)'}else{'Ctrl+B'}
 $dataRoot=Join-Path $PSScriptRoot ('selection-'+[Guid]::NewGuid().ToString('N').Substring(0,8))
 New-Item -ItemType Directory -Path $dataRoot|Out-Null
 $backup=[Windows.DataObject]::new()
@@ -68,19 +72,25 @@ function Set-ExternalImage {
 try{
  $fixture.Show();$fixture.Activate();Pump 200
  $diag=Join-Path $dataRoot 'diagnostics.txt'
- $settings=@{ClipboardImages=$true;ScreenshotFolder=$true;Folders=@();WelcomeShown=$true;CaptureShortcut='CtrlB';CaptureShortcutRevision=1}
+ $settings=@{ClipboardImages=$true;ScreenshotFolder=$true;Folders=@();WelcomeShown=$true;CaptureShortcut=$(if($CustomShortcut){'Custom'}else{'CtrlB'});CaptureShortcutRevision=1;CustomCaptureModifiers=2;CustomCaptureKey=$captureKey}
  [IO.File]::WriteAllText((Join-Path $dataRoot 'settings.json'),($settings|ConvertTo-Json),[Text.UTF8Encoding]::new($false))
- $appProcess=Start-Process -FilePath (Join-Path $projectRoot 'dist\Snapline.exe') -ArgumentList @('--data-dir',('"'+$dataRoot+'"'),'--diagnostics',('"'+$diag+'"')) -WindowStyle Hidden -PassThru
- Pump 1000
+ $appProcess=Start-Process -FilePath $binary -ArgumentList @('--data-dir',('"'+$dataRoot+'"'),'--diagnostics',('"'+$diag+'"')) -WindowStyle Hidden -PassThru
+ $startupDeadline=[DateTime]::UtcNow.AddSeconds(8)
+ while(!(Test-Path -LiteralPath $diag) -and !$appProcess.HasExited -and [DateTime]::UtcNow -lt $startupDeadline){Pump 100}
+ if(!(Test-Path -LiteralPath $diag)){throw 'Startup diagnostics were not produced.'}
  $diagnostics=[IO.File]::ReadAllText($diag)
  if(!$diagnostics.Contains('captureHotkey=True') -or !$diagnostics.Contains('clipboardListener=False')){throw 'Unexpected capture/listener state.'}
  $main=[IntPtr]::new([long]([regex]::Match($diagnostics,'windowHandle=(\d+)').Groups[1].Value))
  $fixture.Activate();Pump 200
- [SnaplineSelectionQA]::keybd_event(0x11,0,0,[UIntPtr]::Zero);[SnaplineSelectionQA]::keybd_event(0x42,0,0,[UIntPtr]::Zero)
+ [SnaplineSelectionQA]::keybd_event(0x11,0,0,[UIntPtr]::Zero);[SnaplineSelectionQA]::keybd_event($captureKey,0,0,[UIntPtr]::Zero)
  Pump 80
- [SnaplineSelectionQA]::keybd_event(0x42,0,2,[UIntPtr]::Zero);[SnaplineSelectionQA]::keybd_event(0x11,0,2,[UIntPtr]::Zero)
+ [SnaplineSelectionQA]::keybd_event(0x11,0,2,[UIntPtr]::Zero)
+ Pump 350
+ if((Find-Overlay) -ne [IntPtr]::Zero){throw 'Overlay opened before trigger key was released.'}
+ $report.Add('PASS: capture waits for the actual trigger key after Ctrl is released')
+ [SnaplineSelectionQA]::keybd_event($captureKey,0,2,[UIntPtr]::Zero)
  $overlay=Wait-Overlay
- $report.Add('PASS: real Ctrl+B keyboard input opens the built-in selection surface')
+ $report.Add('PASS: real '+$captureLabel+' keyboard input opens the built-in selection surface')
  Set-ExternalImage;$lastOwnedSequence=[SnaplineSelectionQA]::GetClipboardSequenceNumber();Pump 300
  if(@(Get-Items).Count -ne 0){throw 'External clipboard image was collected during actual selection.'}
  $report.Add('PASS: competing clipboard image during the real selection is ignored')
@@ -124,13 +134,16 @@ try{
  [SnaplineSelectionQA]::mouse_event(8,0,0,0,[UIntPtr]::Zero);[SnaplineSelectionQA]::mouse_event(16,0,0,0,[UIntPtr]::Zero);Pump 400
  if((Find-Overlay) -ne [IntPtr]::Zero -or @(Get-Items).Count -ne 1){throw 'Right-click did not cancel cleanly.'}
  $report.Add('PASS: real right-click cancels selection without adding an image')
+}catch{
+ $report.Add('FAIL: '+$_.Exception.Message)
+ throw
 }finally{
  [SnaplineSelectionQA]::mouse_event(4,0,0,0,[UIntPtr]::Zero)
- [SnaplineSelectionQA]::keybd_event(0x42,0,2,[UIntPtr]::Zero);[SnaplineSelectionQA]::keybd_event(0x11,0,2,[UIntPtr]::Zero)
+ [SnaplineSelectionQA]::keybd_event($captureKey,0,2,[UIntPtr]::Zero);[SnaplineSelectionQA]::keybd_event(0x11,0,2,[UIntPtr]::Zero)
  if($null -ne $appProcess -and !$appProcess.HasExited){
   $active=Find-Overlay;if($active -ne [IntPtr]::Zero){[void][SnaplineSelectionQA]::PostMessage($active,0x10,[IntPtr]::Zero,[IntPtr]::Zero);Pump 200}
   if($null -ne $main){[void][SnaplineSelectionQA]::PostMessage($main,0x10,[IntPtr]::Zero,[IntPtr]::Zero)}
-  if(!$appProcess.WaitForExit(4000)){throw 'Selection test instance did not exit gracefully.'}
+  if(!$appProcess.WaitForExit(4000)){$report.Add('FAIL: selection test instance did not exit gracefully')}
  }
  $fixture.Close();$fixture.Dispose();$label.Font.Dispose()
  if([SnaplineSelectionQA]::GetClipboardSequenceNumber() -eq $lastOwnedSequence -or [Windows.Clipboard]::IsCurrent($backup)){

@@ -1,0 +1,9 @@
+﻿PASS: capture waits for the actual trigger key after Ctrl is released
+PASS: real Ctrl+F11 (custom) keyboard input opens the built-in selection surface
+PASS: competing clipboard image during the real selection is ignored
+PASS: real selection mouse messages save exactly 120x80 original-color pixels, without capture UI or shade
+PASS: completed capture is copied to the clipboard
+PASS: real Esc cancels selection without collecting or overwriting the competing clipboard image
+PASS: external image copied after actual cancellation is ignored
+PASS: real right-click cancels selection without adding an image
+PASS: previous clipboard restored

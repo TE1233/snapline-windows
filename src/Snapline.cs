@@ -28,7 +28,7 @@ using Path = System.IO.Path;
 
 [assembly: System.Reflection.AssemblyTitle("Snapline - 截图晾台")]
 [assembly: System.Reflection.AssemblyDescription("Private, local screenshot shelf for Windows")]
-[assembly: System.Reflection.AssemblyVersion("0.5.0.0")]
+[assembly: System.Reflection.AssemblyVersion("0.5.1.0")]
 
 namespace Snapline
 {
@@ -52,9 +52,10 @@ namespace Snapline
         [DllImport("user32.dll")] internal static extern uint GetDpiForWindow(IntPtr h);
         [DllImport("dwmapi.dll")] internal static extern int DwmGetWindowAttribute(IntPtr h, int attr, out Rect r, int size);
         [DllImport("user32.dll")] internal static extern short GetAsyncKeyState(int key);
-        internal static bool CaptureKeysReleased()
+        internal static bool CaptureKeysReleased(uint triggerKey)
         {
-            return new[] { 0x10, 0x11, 0x12, 0x5B, 0x5C, 0x2C, 0x42 }.All(key => (GetAsyncKeyState(key) & 0x8000) == 0);
+            return new[] { 0x10, 0x11, 0x12, 0x5B, 0x5C }.All(key => (GetAsyncKeyState(key) & 0x8000) == 0) &&
+                (triggerKey == 0 || (GetAsyncKeyState((int)triggerKey) & 0x8000) == 0);
         }
         [StructLayout(LayoutKind.Sequential)] internal struct Rect { internal int Left, Top, Right, Bottom; }
         [StructLayout(LayoutKind.Sequential)] internal struct Point { internal int X, Y; }
@@ -77,6 +78,8 @@ namespace Snapline
         [DataMember] public bool WelcomeShown;
         [DataMember] public string CaptureShortcut = "CtrlB";
         [DataMember] public int CaptureShortcutRevision = 1;
+        [DataMember] public uint CustomCaptureModifiers;
+        [DataMember] public uint CustomCaptureKey;
     }
 
     sealed partial class Store
@@ -100,7 +103,9 @@ namespace Snapline
                 if (Settings.CaptureShortcut == "CtrlPrintScreen") Settings.CaptureShortcut = "CtrlB";
                 Settings.CaptureShortcutRevision = 1;
             }
-            if (Settings.CaptureShortcut != "CtrlB" && Settings.CaptureShortcut != "CtrlPrintScreen" && Settings.CaptureShortcut != "ShiftPrintScreen" && Settings.CaptureShortcut != "None")
+            if (Settings.CaptureShortcut != "CtrlB" && Settings.CaptureShortcut != "CtrlPrintScreen" && Settings.CaptureShortcut != "ShiftPrintScreen" && Settings.CaptureShortcut != "None" && Settings.CaptureShortcut != "Custom")
+                Settings.CaptureShortcut = "CtrlB";
+            if (Settings.CaptureShortcut == "Custom" && ShortcutSpec.Validate(Settings.CustomCaptureModifiers, Settings.CustomCaptureKey) != null)
                 Settings.CaptureShortcut = "CtrlB";
             RestoreNotes();
             var saved = Read<List<Shot>>(Path.Combine(Root, "items.json")) ?? new List<Shot>();
@@ -297,7 +302,7 @@ namespace Snapline
         string toast = "";
         DateTime toastUntil;
         internal bool ClipboardRegistered, HotkeyRegistered, CaptureHotkeyRegistered;
-        internal string CaptureShortcutLabel { get { return store.Settings.CaptureShortcut == "ShiftPrintScreen" ? "Shift + PrtSc" : store.Settings.CaptureShortcut == "None" ? "快捷键已关闭" : store.Settings.CaptureShortcut == "CtrlPrintScreen" ? "Ctrl + PrtSc" : "Ctrl + B"; } }
+        internal string CaptureShortcutLabel { get { var shortcut = ShortcutSpec.From(store.Settings); return shortcut == null ? "快捷键已关闭" : shortcut.Label; } }
         internal Shelf(Store data, bool noCapture, bool demo)
         {
             store = data;
@@ -376,7 +381,11 @@ namespace Snapline
             if (msg == Native.Hotkey)
             {
                 if (w.ToInt32() == 1) { Toggle(); handled = true; }
-                else if (w.ToInt32() == 2) { StartCapture(store.Settings.CaptureShortcut == "CtrlB"); handled = true; }
+                else if (w.ToInt32() == captureHotkeyId && CaptureHotkeyRegistered)
+                {
+                    if (!editingShortcut) StartCapture(ShortcutCollects, ShortcutSpec.From(store.Settings).Key);
+                    handled = true;
+                }
             }
             if ((uint)msg == Native.ShowMessage) { ToggleFromTray(); handled = true; }
             return IntPtr.Zero;
@@ -509,30 +518,28 @@ namespace Snapline
         }
         internal void RegisterCaptureShortcut()
         {
-            Native.UnregisterHotKey(handle, 2);
-            CaptureHotkeyRegistered = false;
-            if (store.Settings.CaptureShortcut != "None")
-                CaptureHotkeyRegistered = Native.RegisterHotKey(handle, 2,
-                    store.Settings.CaptureShortcut == "ShiftPrintScreen" ? 0x4004u : 0x4002u, store.Settings.CaptureShortcut == "CtrlB" ? 0x42u : 0x2Cu);
+            Native.UnregisterHotKey(handle, captureHotkeyId);
+            captureHotkeyId = 2;
+            var shortcut = ShortcutSpec.From(store.Settings);
+            CaptureHotkeyRegistered = shortcut != null && Native.RegisterHotKey(handle, captureHotkeyId, shortcut.Modifiers | 0x4000u, shortcut.Key);
         }
         void SelectCaptureShortcut(string shortcut)
         {
-            store.Settings.CaptureShortcut = shortcut;
-            RegisterCaptureShortcut();
-            store.SaveSettings();
-            UpdateShortcutMenu();
-            Render();
-            if (shortcut != "None" && !CaptureHotkeyRegistered)
-                Notify(CaptureShortcutLabel + " 已被占用，未接管。请更换组合或点击剪刀截图。");
+            string error;
+            if (!TrySelectCaptureShortcut(shortcut, 0, 0, out error)) Notify(error);
         }
         void UpdateShortcutMenu()
         {
             if (captureMenu != null) captureMenu.Text = "框选截图（仅复制）";
             foreach (var choice in shortcutChoices)
+            {
                 choice.Value.Checked = choice.Key == store.Settings.CaptureShortcut;
+                if (choice.Key == "Custom")
+                    choice.Value.Text = store.Settings.CaptureShortcut == "Custom" ? "自定义…（" + CaptureShortcutLabel + "）" : "自定义…";
+            }
         }
         internal void StartCapture() { StartCapture(false); }
-        internal void StartCapture(bool collect)
+        internal void StartCapture(bool collect, uint triggerKey = 0)
         {
             if (capturePending || shuttingDown) return;
             CloseImagePreview(); CloseNotePreview();
@@ -540,14 +547,14 @@ namespace Snapline
             pinned = false; Collapse(true);
             canvas.Visibility = Visibility.Hidden;
             capturePending = true; captureSerial++;
-            collectCapture = collect;
+            collectCapture = collect; captureTriggerKey = triggerKey;
             captureRequested = DateTime.Now;
             hideUntil = DateTime.Now.AddSeconds(5);
             captureDelay.Start();
         }
         void CaptureWhenReleased(object sender, EventArgs e)
         {
-            if (!Native.CaptureKeysReleased())
+            if (!Native.CaptureKeysReleased(captureTriggerKey))
             {
                 if ((DateTime.Now - captureRequested).TotalSeconds < 5) return;
                 captureDelay.Stop(); CompleteCapture(captureSerial, null, false);
@@ -578,7 +585,8 @@ namespace Snapline
                 store.Add(image, "晾台截图");
                 Notify(copied ? "截图已挂上晾台，并复制到剪贴板。" : "截图已挂上晾台；剪贴板暂时被占用，可单击图片重试复制。");
             }
-            else Notify(copied ? "截图已复制。自动挂上晾台请使用 Ctrl + B。" : "剪贴板被占用，截图未复制，请重试。");
+            else Notify(copied ? (ShortcutCollects ? "截图已复制。自动挂上晾台请使用 " + CaptureShortcutLabel + "。" :
+                "截图已复制。自动挂上请在托盘选择 Ctrl+B 或自定义快捷键。") : "剪贴板被占用，截图未复制，请重试。");
         }
         ToolTip HelpPopup()
         {
@@ -586,7 +594,7 @@ namespace Snapline
             var title = Text("截图晾台 · 操作提示", 13, "#FF27668F");
             title.FontWeight = FontWeights.SemiBold; title.Margin = new Thickness(0, 0, 0, 10);
             content.Children.Add(title);
-            AddHelpRow(content, "Ctrl + B", "框选截图，完成后自动挂上");
+            AddHelpRow(content, CaptureShortcutLabel, ShortcutCollects ? "框选截图，完成后自动挂上" : "在托盘设置截图快捷键");
             if (!CaptureHotkeyRegistered && store.Settings.CaptureShortcut != "None")
                 content.Children.Add(new TextBlock { Text = CaptureShortcutLabel + " 已被占用，可在托盘更换", FontSize = 10, Foreground = Brush("#FF9C6A3B"), Margin = new Thickness(0, 0, 0, 7) });
             AddHelpRow(content, "卡片截图按钮", "只复制，不自动挂上晾台");
@@ -598,7 +606,7 @@ namespace Snapline
             AddHelpRow(content, "单击 / 双击", "复制图片 / 打开查看");
             AddHelpRow(content, "拖出 / 长按", "拖到文件夹 / 用画图编辑");
             AddHelpRow(content, "右键图片", "另存为、移除等更多操作");
-            var footer = Text("仅 Ctrl+B 自动收集，托盘可设置快捷键", 10, "#FF81909D");
+            var footer = Text("仅晾台快捷键截图会自动加入；托盘可自定义", 10, "#FF81909D");
             footer.Margin = new Thickness(0, 7, 0, 0); content.Children.Add(footer);
             if (store.Settings.CaptureShortcut == "CtrlB")
             {
@@ -619,7 +627,7 @@ namespace Snapline
             var row = new Grid { Margin = new Thickness(0, 0, 0, 6) };
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(112) });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            var label = Text(key, 10.5, "#FF347DA7");
+            var label = Text(key, 10.5, "#FF347DA7"); label.TextWrapping = TextWrapping.Wrap; label.Margin = new Thickness(0, 0, 8, 0);
             var detail = new TextBlock { Text = action, FontSize = 10.5, Foreground = Brush("#FF596775"), TextWrapping = TextWrapping.Wrap };
             Grid.SetColumn(detail, 1); row.Children.Add(label); row.Children.Add(detail); content.Children.Add(row);
         }
@@ -633,12 +641,12 @@ namespace Snapline
             captureMenu = new Forms.ToolStripMenuItem("框选截图（仅复制）", null, delegate { StartCapture(); });
             menu.Items.Add(captureMenu);
             var shortcutMenu = new Forms.ToolStripMenuItem("截图快捷键");
-            string[] modes = { "CtrlB", "CtrlPrintScreen", "ShiftPrintScreen", "None" };
-            string[] labels = { "Ctrl + B（默认）", "Ctrl + PrtSc（仅复制）", "Shift + PrtSc（仅复制）", "关闭快捷键" };
+            string[] modes = { "CtrlB", "CtrlPrintScreen", "ShiftPrintScreen", "Custom", "None" };
+            string[] labels = { "Ctrl + B（默认）", "Ctrl + PrtSc（仅复制）", "Shift + PrtSc（仅复制）", "自定义…", "关闭快捷键" };
             for (int i = 0; i < modes.Length; i++)
             {
                 string selected = modes[i];
-                var choice = new Forms.ToolStripMenuItem(labels[i], null, delegate { SelectCaptureShortcut(selected); });
+                var choice = new Forms.ToolStripMenuItem(labels[i], null, delegate { if (selected == "Custom") EditCaptureShortcut(); else SelectCaptureShortcut(selected); });
                 shortcutChoices.Add(selected, choice); shortcutMenu.DropDownItems.Add(choice);
             }
             menu.Items.Add(shortcutMenu);
@@ -652,7 +660,7 @@ namespace Snapline
             menu.Items.Add("上一组", null, delegate { ChangePage(-1); Reveal(); });
             menu.Items.Add("下一组", null, delegate { ChangePage(1); Reveal(); });
             menu.Items.Add(new Forms.ToolStripSeparator());
-            menu.Items.Add(new Forms.ToolStripMenuItem("只自动收集 Ctrl+B 截图") { Enabled = false });
+            menu.Items.Add(new Forms.ToolStripMenuItem("只自动收集晾台快捷键截图") { Enabled = false });
             menu.Items.Add(new Forms.ToolStripSeparator());
             menu.Items.Add("打开暂存文件夹", null, delegate { Launch(store.Inbox); });
             menu.Items.Add("清空截图…", null, delegate
@@ -676,7 +684,7 @@ namespace Snapline
             dialogOpen = true;
             try
             {
-                Forms.MessageBox.Show("截图晾台 Snapline 0.5.0\n\n" + CaptureShortcutLabel + "：框选截图（需快捷键可用）。\n图片右侧「操作提示」：悬停查看说明，点击内部按钮仅截图并复制。\nWin + Shift + S 和其他软件截图不会自动加入。\nCtrl + Alt + T：展开 / 收起，展开后保持显示。\n双击托盘图标：临时展开，离开后自动收起。\n托盘「固定显示」：勾选保持显示，取消后恢复自动收起。\n鼠标停在屏幕顶部：临时展开。\n单击图片：复制。双击：查看。\n拖出：复制为文件。按 Shift 拖到文件夹：移动。\n长按图片：用画图编辑。右键：更多操作。\n\n只自动收集 Ctrl+B 发起的框选截图。微信截图、普通复制图片和外部截图文件夹均不自动收集。\n最多保留 60 张，超过后清理最早的应用副本。\n完全本地运行，不联网、不上传、不修改系统截图设置。", "截图晾台", Forms.MessageBoxButtons.OK, Forms.MessageBoxIcon.Information);
+                Forms.MessageBox.Show("截图晾台 Snapline 0.5.1\n\n" + CaptureShortcutLabel + "：框选截图（需快捷键可用）。\n图片右侧「操作提示」：悬停查看说明，点击内部按钮仅截图并复制。\nWin + Shift + S 和其他软件截图不会自动加入。\nCtrl + Alt + T：展开 / 收起，展开后保持显示。\n双击托盘图标：临时展开，离开后自动收起。\n托盘「固定显示」：勾选保持显示，取消后恢复自动收起。\n鼠标停在屏幕顶部：临时展开。\n单击图片：复制。双击：查看。\n拖出：复制为文件。按 Shift 拖到文件夹：移动。\n长按图片：用画图编辑。右键：更多操作。\n\n默认 Ctrl+B 或自定义快捷键发起的框选截图会自动加入。微信截图、普通复制图片和外部截图文件夹均不自动收集。\n最多保留 60 张，超过后清理最早的应用副本。\n完全本地运行，不联网、不上传、不修改系统截图设置。", "截图晾台", Forms.MessageBoxButtons.OK, Forms.MessageBoxIcon.Information);
             }
             finally { dialogOpen = false; }
         }
@@ -1195,7 +1203,7 @@ namespace Snapline
             if (helpTip != null) helpTip.IsOpen = false;
 
             if (inboxWatcher != null) inboxWatcher.Dispose();
-            Native.UnregisterHotKey(handle, 1); Native.UnregisterHotKey(handle, 2);
+            Native.UnregisterHotKey(handle, 1); Native.UnregisterHotKey(handle, 2); Native.UnregisterHotKey(handle, 3);
             if (source != null) source.RemoveHook(Message);
             if (tray != null) { tray.Visible = false; tray.Dispose(); }
             store.Save(); store.SaveSettings();
@@ -1217,6 +1225,7 @@ namespace Snapline
                 if (args.Contains("--self-test")) { SelfTest(root); return 0; }
                 if (args.Contains("--integration-test")) return Integration.Run(root);
                 if (args.Contains("--memo-test")) return MemoTests.Run(root);
+                if (args.Contains("--shortcut-test")) return ShortcutTests.Run(root);
                 bool fresh;
                 using (var mutex = new Mutex(true, "Local\\Snapline-" + BitConverter.ToString(SHA256.Create().ComputeHash(Encoding.UTF8.GetBytes(Path.GetFullPath(root)))).Replace("-", "").Substring(0, 20), out fresh))
                 {
@@ -1255,7 +1264,7 @@ namespace Snapline
                         {
                             delay.Stop();
                             if (snapshot != null) shelf.Snapshot(snapshot);
-                            if (diagnostics != null) System.IO.File.WriteAllText(diagnostics, "collectionMode=CtrlBOnly" + Environment.NewLine + "captureUi=BuiltinRegion" + Environment.NewLine + "clipboardListener=" + shelf.ClipboardRegistered + Environment.NewLine + "hotkey=" + shelf.HotkeyRegistered + Environment.NewLine + "captureHotkey=" + shelf.CaptureHotkeyRegistered + Environment.NewLine + "captureShortcut=" + shelf.CaptureShortcutLabel + Environment.NewLine + "items=" + store.Items.Count + Environment.NewLine + "notes=" + store.Notes.Count + Environment.NewLine + "windowHandle=" + new WindowInteropHelper(shelf).Handle.ToInt64() + Environment.NewLine);
+                            if (diagnostics != null) System.IO.File.WriteAllText(diagnostics, "collectionMode=ConfiguredShortcutOnly" + Environment.NewLine + "captureUi=BuiltinRegion" + Environment.NewLine + "clipboardListener=" + shelf.ClipboardRegistered + Environment.NewLine + "hotkey=" + shelf.HotkeyRegistered + Environment.NewLine + "captureHotkey=" + shelf.CaptureHotkeyRegistered + Environment.NewLine + "captureShortcut=" + shelf.CaptureShortcutLabel + Environment.NewLine + "items=" + store.Items.Count + Environment.NewLine + "notes=" + store.Notes.Count + Environment.NewLine + "windowHandle=" + new WindowInteropHelper(shelf).Handle.ToInt64() + Environment.NewLine);
                         };
                         delay.Start();
                     };

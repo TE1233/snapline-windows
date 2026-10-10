@@ -227,7 +227,30 @@ namespace Snapline
                     else if (phase == 65 && (DateTime.Now - phaseStart).TotalMilliseconds > 450)
                     {
                         if (store.Items.Count != 1 || !Clipboard.ContainsImage()) throw new Exception("Alternate screenshot shortcut was automatically collected.");
-                        require("alternate screenshot shortcut copies without automatic collection; only Ctrl+B collects");
+                        require("alternate screenshot shortcut copies without automatic collection; default Ctrl+B and custom combinations collect");
+                        string shortcutError;
+                        if (!shelf.TrySelectCaptureShortcut("Custom", 6, 0x78, out shortcutError)) throw new Exception(shortcutError);
+                        Native.PostMessage(new System.Windows.Interop.WindowInteropHelper(shelf).Handle, Native.Hotkey, new IntPtr(shelf.CaptureHotkeyId), IntPtr.Zero);
+                        phase = 66; phaseStart = DateTime.Now;
+                    }
+                    else if (phase == 66 && (DateTime.Now - phaseStart).TotalMilliseconds > 500)
+                    {
+                        captureResult(Program.Demo("CUSTOM CAPTURE", "自定义快捷键截图", "#426C60"));
+                        lastOwnedSequence = Native.GetClipboardSequenceNumber();
+                        phase = 67; phaseStart = DateTime.Now;
+                    }
+                    else if (phase == 67 && (DateTime.Now - phaseStart).TotalMilliseconds > 450)
+                    {
+                        if (store.Items.Count != 2 || !Clipboard.ContainsImage()) throw new Exception("Custom shortcut did not collect its direct result.");
+                        require("custom screenshot shortcut collects its own result and copies it");
+                        Clipboard.SetImage(Program.Demo("EXTERNAL AFTER CUSTOM", "换键后外部截图", "#315B75"));
+                        lastOwnedSequence = Native.GetClipboardSequenceNumber();
+                        phase = 68; phaseStart = DateTime.Now;
+                    }
+                    else if (phase == 68 && (DateTime.Now - phaseStart).TotalMilliseconds > 450)
+                    {
+                        if (store.Items.Count != 2) throw new Exception("Custom shortcut enabled external collection.");
+                        require("external screenshots remain ignored after choosing a custom shortcut");
                         store.Settings.CaptureShortcut = "CtrlB"; shelf.RegisterCaptureShortcut();
                         phase = 7; phaseStart = DateTime.Now;
                     }

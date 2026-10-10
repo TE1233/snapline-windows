@@ -1,0 +1,5 @@
+﻿PASS: custom preference round-trip, legacy defaults, invalid/reserved key validation
+PASS: occupied combination and save failure preserve old registration and preference
+PASS: real Ctrl+Shift+F9 recording, own shortcut suspended, save button enables and persists
+PASS: cancel restores old shortcut without saving the new candidate
+PASS: inline conflict feedback permits retry; two-key Ctrl+F11 survives restart

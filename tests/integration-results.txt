@@ -10,7 +10,9 @@ PASS: editing an existing cached image still refreshes its card
 PASS: cancelled Ctrl+B session preserves clipboard and adds no image
 PASS: images copied after cancellation and late cancelled-session results are ignored
 PASS: mouse capture button copies without automatic collection
-PASS: alternate screenshot shortcut copies without automatic collection; only Ctrl+B collects
+PASS: alternate screenshot shortcut copies without automatic collection; default Ctrl+B and custom combinations collect
+PASS: custom screenshot shortcut collects its own result and copies it
+PASS: external screenshots remain ignored after choosing a custom shortcut
 PASS: previous clipboard formats restored
 PASS: WM_HOTKEY collapses shelf to thin top indicator
 PASS: WM_HOTKEY expands shelf without taking keyboard focus
@@ -25,3 +27,4 @@ PASS: unchecking fixed-display restores auto-collapse
 PASS: Ctrl+Alt+T still opens with fixed display
 PASS: tray toggle closes fixed-display shelf
 PASS: second-launch opening also restores automatic collapse
+PASS: test mouse position restored

@@ -1,4 +1,5 @@
-﻿$ErrorActionPreference = 'Stop'
+﻿param([string]$OutputDirectory)
+$ErrorActionPreference = 'Stop'
 $projectRoot = $PSScriptRoot
 $framework = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319'
 if (!(Test-Path -LiteralPath (Join-Path $framework 'csc.exe'))) {
@@ -6,7 +7,7 @@ if (!(Test-Path -LiteralPath (Join-Path $framework 'csc.exe'))) {
 }
 $csc = Join-Path $framework 'csc.exe'
 if (!(Test-Path -LiteralPath $csc)) { throw '需要 Windows 自带的 .NET Framework 4.8。' }
-$dist = Join-Path $projectRoot 'dist'
+$dist = if ($OutputDirectory) { [IO.Path]::GetFullPath($OutputDirectory) } else { Join-Path $projectRoot 'dist' }
 New-Item -ItemType Directory -Path $dist -Force | Out-Null
 # Original icon: a mint-colored screenshot card clipped to a charcoal line.
 Add-Type -AssemblyName System.Drawing
@@ -35,13 +36,13 @@ Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; pu
 $graphics.Dispose(); $bitmap.Dispose(); $mint.Dispose(); $white.Dispose(); $dark.Dispose(); $pen.Dispose()
 $references = @(
     'System.dll','System.Core.dll','System.Drawing.dll','System.Windows.Forms.dll','System.Runtime.Serialization.dll',
-    'WPF\WindowsBase.dll','WPF\PresentationCore.dll','WPF\PresentationFramework.dll','System.Xaml.dll'
+    'WPF\WindowsBase.dll','WPF\PresentationCore.dll','WPF\PresentationFramework.dll','System.Xaml.dll','WPF\UIAutomationProvider.dll'
 ) | ForEach-Object { '/reference:' + (Join-Path $framework $_) }
 $arguments = @('/nologo','/target:winexe','/platform:anycpu','/optimize+','/utf8output',
     ('/out:' + (Join-Path $dist 'Snapline.exe')),
     ('/win32manifest:' + (Join-Path $projectRoot 'app.manifest')),
     ('/win32icon:' + $iconFile)
-) + $references + (Join-Path $projectRoot 'src\Snapline.cs'), (Join-Path $projectRoot 'src\Integration.cs'), (Join-Path $projectRoot 'src\RegionCapture.cs'), (Join-Path $projectRoot 'src\Memo.cs')
+) + $references + (Join-Path $projectRoot 'src\Snapline.cs'), (Join-Path $projectRoot 'src\Integration.cs'), (Join-Path $projectRoot 'src\RegionCapture.cs'), (Join-Path $projectRoot 'src\Memo.cs'), (Join-Path $projectRoot 'src\Shortcut.cs'), (Join-Path $projectRoot 'src\ShortcutEditor.cs'), (Join-Path $projectRoot 'src\ShortcutTests.cs')
 & $csc @arguments
 if ($LASTEXITCODE -ne 0) { throw '编译失败。' }
 Copy-Item -LiteralPath (Join-Path $projectRoot 'Snapline.exe.config') -Destination $dist -Force

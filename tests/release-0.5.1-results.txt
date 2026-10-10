@@ -1,0 +1,10 @@
+﻿Snapline Windows 0.5.1 verification - 2026-10-10
+PASS: store, memo, integration, custom shortcut UI and hotkey conflict suite
+PASS: real two-key Ctrl+F11 opens region capture and waits for trigger-key release
+PASS: selection saves original 120x80 pixels and copies the image
+PASS: external clipboard screenshots remain ignored during and after capture
+PASS: Esc and right-click cancel without overwriting clipboard
+PASS: occupied key and failed settings save retain old registration and preferences
+PASS: actual key recorder, cancel, conflict retry and restart persistence
+PASS: current app upgraded to 0.5.1 with existing image and memo data hashes unchanged
+PASS: portable archive contents match installed dist files and include source attribution

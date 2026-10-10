@@ -21,3 +21,8 @@
 *.log
 .vs/
 .vscode/
+!/Snapline-Windows-0.5.1-portable.zip
+!/Snapline-Windows-0.5.1-source.zip
+!/tests/shortcut-results.txt
+!/tests/custom-selection-results.txt
+!/tests/release-0.5.1-results.txt
