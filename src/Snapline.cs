@@ -28,7 +28,7 @@ using Path = System.IO.Path;
 
 [assembly: System.Reflection.AssemblyTitle("Snapline - 截图晾台")]
 [assembly: System.Reflection.AssemblyDescription("Private, local screenshot shelf for Windows")]
-[assembly: System.Reflection.AssemblyVersion("0.5.1.0")]
+[assembly: System.Reflection.AssemblyVersion("0.5.2.0")]
 
 namespace Snapline
 {
@@ -44,6 +44,9 @@ namespace Snapline
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern uint RegisterWindowMessage(string message);
         [DllImport("user32.dll")] internal static extern bool PostMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
         [DllImport("user32.dll")] internal static extern IntPtr GetForegroundWindow();
+        [DllImport("user32.dll")] internal static extern IntPtr GetShellWindow();
+        [DllImport("user32.dll")] internal static extern bool IsZoomed(IntPtr h);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern int GetClassName(IntPtr h, StringBuilder name, int count);
         [DllImport("user32.dll")] internal static extern bool GetWindowRect(IntPtr h, out Rect r);
         [DllImport("user32.dll")] internal static extern bool GetCursorPos(out Point p);
         [DllImport("user32.dll")] internal static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int width, int height, uint flags);
@@ -295,7 +298,9 @@ namespace Snapline
         HwndSource source;
         Forms.Screen screen;
         bool expanded, pinned, dragging, dialogOpen, shuttingDown;
-        DateTime keepUntil, hideUntil, topSince, lastInside;
+        DateTime keepUntil, hideUntil, lastInside;
+        readonly TopHoverGate hoverGate = new TopHoverGate();
+        internal Func<IntPtr> ForegroundWindow = Native.GetForegroundWindow;
 
         int page;
         double shelfWidth;
@@ -418,38 +423,35 @@ namespace Snapline
             canvas.Height = open ? 270 : 4;
             if (changed) page = 0;
         }
-        bool Fullscreen()
+        bool Fullscreen(Forms.Screen target = null)
         {
-            IntPtr foreground = Native.GetForegroundWindow();
+            IntPtr foreground = ForegroundWindow();
             if (foreground == IntPtr.Zero || foreground == handle || dialogOpen || dragging) return false;
-            Native.Rect rect;
-            if (Native.DwmGetWindowAttribute(foreground, 9, out rect, Marshal.SizeOf(typeof(Native.Rect))) != 0 && !Native.GetWindowRect(foreground, out rect)) return false;
-            var b = screen.Bounds;
-            return Math.Abs(rect.Left - b.Left) <= 2 && Math.Abs(rect.Top - b.Top) <= 2 &&
-                Math.Abs(rect.Right - b.Right) <= 2 && Math.Abs(rect.Bottom - b.Bottom) <= 2;
+            return HoverPolicy.Suppresses(foreground, (target ?? screen).Bounds);
         }
         void Tick(object sender, EventArgs e)
         {
             if (shuttingDown) return;
             ProcessPending();
-            if (dialogOpen || dragging || helpReading || capturePending) return;
-            Native.Point p; Native.GetCursorPos(out p);
+            if (dialogOpen || dragging || helpReading || capturePending) { hoverGate.Reset(); return; }
+            Native.Point p; if (!Native.GetCursorPos(out p)) { hoverGate.Reset(); return; }
             Forms.Screen under = Forms.Screen.FromPoint(new Drawing.Point(p.X, p.Y));
             var area = under.WorkingArea;
             DateTime now = DateTime.Now;
-            if (!demo && screen.DeviceName == under.DeviceName && Fullscreen()) { if (expanded) Collapse(false); return; }
-            if ((imageTip != null && imageTip.IsOpen) || (noteTip != null && noteTip.IsOpen)) { lastInside = now; return; }
-            bool atTop = p.Y >= area.Top && p.Y < area.Top + Math.Max(4, 4 * Dpi());
-            if (atTop && now >= hideUntil)
+            if (!demo && Fullscreen(under))
             {
-                if (topSince == DateTime.MinValue) topSince = now;
-                if ((now - topSince).TotalMilliseconds > 280)
-                {
-                    if (screen.DeviceName != under.DeviceName) { Position(expanded, under); Render(); }
-                    if (!Fullscreen()) Reveal();
-                }
+                hoverGate.Reset();
+                if (expanded && screen.DeviceName == under.DeviceName) Collapse(false);
+                return;
             }
-            else topSince = DateTime.MinValue;
+            if ((imageTip != null && imageTip.IsOpen) || (noteTip != null && noteTip.IsOpen)) { lastInside = now; return; }
+            if (now < hideUntil) hoverGate.Reset();
+            else if (hoverGate.Observe(under.DeviceName, area, p.X, p.Y, screen.DeviceName == under.DeviceName ? Dpi() : 1, now) &&
+                (!expanded || screen.DeviceName != under.DeviceName))
+            {
+                if (screen.DeviceName != under.DeviceName) { Position(expanded, under); Render(); }
+                Reveal();
+            }
             bool inside = expanded && p.X >= screen.WorkingArea.Left && p.X < screen.WorkingArea.Right &&
                 p.Y >= screen.WorkingArea.Top && p.Y < screen.WorkingArea.Top + 266 * Dpi();
             if (inside) lastInside = now;
@@ -480,6 +482,7 @@ namespace Snapline
         {
             expanded = false;
             if (manual) { pinned = false; hideUntil = DateTime.Now.AddSeconds(1); }
+            hoverGate.Reset();
             Position(false, screen);
             canvas.BeginAnimation(UIElement.OpacityProperty, null);
             canvas.Opacity = 1;
@@ -684,7 +687,7 @@ namespace Snapline
             dialogOpen = true;
             try
             {
-                Forms.MessageBox.Show("截图晾台 Snapline 0.5.1\n\n" + CaptureShortcutLabel + "：框选截图（需快捷键可用）。\n图片右侧「操作提示」：悬停查看说明，点击内部按钮仅截图并复制。\nWin + Shift + S 和其他软件截图不会自动加入。\nCtrl + Alt + T：展开 / 收起，展开后保持显示。\n双击托盘图标：临时展开，离开后自动收起。\n托盘「固定显示」：勾选保持显示，取消后恢复自动收起。\n鼠标停在屏幕顶部：临时展开。\n单击图片：复制。双击：查看。\n拖出：复制为文件。按 Shift 拖到文件夹：移动。\n长按图片：用画图编辑。右键：更多操作。\n\n默认 Ctrl+B 或自定义快捷键发起的框选截图会自动加入。微信截图、普通复制图片和外部截图文件夹均不自动收集。\n最多保留 60 张，超过后清理最早的应用副本。\n完全本地运行，不联网、不上传、不修改系统截图设置。", "截图晾台", Forms.MessageBoxButtons.OK, Forms.MessageBoxIcon.Information);
+                Forms.MessageBox.Show("截图晾台 Snapline 0.5.2\n\n" + CaptureShortcutLabel + "：框选截图（需快捷键可用）。\n图片右侧「操作提示」：悬停查看说明，点击内部按钮仅截图并复制。\nWin + Shift + S 和其他软件截图不会自动加入。\nCtrl + Alt + T：展开 / 收起，展开后保持显示。\n双击托盘图标：临时展开，离开后自动收起。\n托盘「固定显示」：勾选保持显示，取消后恢复自动收起。\n鼠标停在屏幕顶部：临时展开。\n单击图片：复制。双击：查看。\n拖出：复制为文件。按 Shift 拖到文件夹：移动。\n长按图片：用画图编辑。右键：更多操作。\n\n默认 Ctrl+B 或自定义快捷键发起的框选截图会自动加入。微信截图、普通复制图片和外部截图文件夹均不自动收集。\n最多保留 60 张，超过后清理最早的应用副本。\n完全本地运行，不联网、不上传、不修改系统截图设置。", "截图晾台", Forms.MessageBoxButtons.OK, Forms.MessageBoxIcon.Information);
             }
             finally { dialogOpen = false; }
         }
@@ -896,7 +899,7 @@ namespace Snapline
             canvas.Children.Clear();
             if (!expanded)
             {
-                var mark = new Border { Width = 68, Height = 2, CornerRadius = new CornerRadius(1), Background = Brush("#D671C6FA"), ToolTip = "鼠标移到顶部展开 · 图片旁「操作提示」查看说明" };
+                var mark = new Border { Width = 68, Height = 2, CornerRadius = new CornerRadius(1), Background = Brush("#D671C6FA"), ToolTip = "鼠标在蓝线附近稍停即可展开 · 图片旁「操作提示」查看说明" };
                 Place(mark, Math.Max(0, (shelfWidth - 68) / 2), 0);
                 return;
             }
@@ -1226,6 +1229,7 @@ namespace Snapline
                 if (args.Contains("--integration-test")) return Integration.Run(root);
                 if (args.Contains("--memo-test")) return MemoTests.Run(root);
                 if (args.Contains("--shortcut-test")) return ShortcutTests.Run(root);
+                if (args.Contains("--hover-test")) return HoverTests.Run(root);
                 bool fresh;
                 using (var mutex = new Mutex(true, "Local\\Snapline-" + BitConverter.ToString(SHA256.Create().ComputeHash(Encoding.UTF8.GetBytes(Path.GetFullPath(root)))).Replace("-", "").Substring(0, 20), out fresh))
                 {

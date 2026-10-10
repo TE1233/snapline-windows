@@ -26,3 +26,8 @@
 !/tests/shortcut-results.txt
 !/tests/custom-selection-results.txt
 !/tests/release-0.5.1-results.txt
+
+!/Snapline-Windows-0.5.2-portable.zip
+!/Snapline-Windows-0.5.2-source.zip
+!/tests/hover-results.txt
+!/tests/release-0.5.2-results.txt

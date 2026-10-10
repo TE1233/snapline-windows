@@ -1,5 +1,7 @@
 ﻿# 截图晾台 Snapline — Windows 版
 
+0.5.2 修复顶部蓝线偶尔不展开：Windows 桌面与普通最大化窗口不再被误判为全屏，扩大蓝线附近的触发范围并容忍轻微鼠标抖动，停留约 0.2 秒展开。
+
 0.5.1 新增自定义截图快捷键：右键托盘图标 → 截图快捷键 → 自定义，直接按下组合键后保存。支持 Ctrl、Shift、Alt 组合，保存时检查全局占用，重启后保留选择，操作提示同步显示。
 
 0.5.0 新增悬挂便签，提供暖黄、薄荷绿、淡紫三种纸色，自动保存到本机，重启后恢复。默认 Ctrl+B 或当前自定义快捷键发起的晾台截图会自动加入。使用晾台自己的框选界面，结果直接挂上天空蓝晾衣绳；微信截图、Windows 截图、普通复制图片及其他软件保存的截图文件均不会自动加入。
@@ -8,13 +10,13 @@
 
 ## 下载
 
-[Windows 便携版 0.5.1](https://github.com/TE1233/snapline-windows/releases/download/v0.5.1/Snapline-Windows-0.5.1-portable.zip) · [源码包 0.5.1](https://github.com/TE1233/snapline-windows/releases/download/v0.5.1/Snapline-Windows-0.5.1-source.zip)
+[Windows 便携版 0.5.2](https://github.com/TE1233/snapline-windows/releases/download/v0.5.2/Snapline-Windows-0.5.2-portable.zip) · [源码包 0.5.2](https://github.com/TE1233/snapline-windows/releases/download/v0.5.2/Snapline-Windows-0.5.2-source.zip)
 
-GitHub 下载不畅时，可尝试 [备用加速下载 1](https://ghfast.top/https://github.com/TE1233/snapline-windows/releases/download/v0.5.1/Snapline-Windows-0.5.1-portable.zip) · [备用加速下载 2](https://gh-proxy.com/https://github.com/TE1233/snapline-windows/releases/download/v0.5.1/Snapline-Windows-0.5.1-portable.zip)。
+GitHub 下载不畅时，可尝试 [备用加速下载 1](https://ghfast.top/https://github.com/TE1233/snapline-windows/releases/download/v0.5.2/Snapline-Windows-0.5.2-portable.zip) · [备用加速下载 2](https://gh-proxy.com/https://github.com/TE1233/snapline-windows/releases/download/v0.5.2/Snapline-Windows-0.5.2-portable.zip)。
 
 这两个入口无需注册，通过第三方服务转发 GitHub 原始发布文件。服务可用性可能变化；一个入口打不开时可尝试另一个。
 
-便携包 SHA-256：`5c9592a689ac92055afbd5bf5b8d660f26ef14d77ed332fba374f98849d9b7a1`
+便携包 SHA-256：`4912941c120cee155eed7768d69cdb053f3a4e12a5d336056810a4937a37d87e`
 
 完整解压便携版后，双击 Snapline.exe 即可运行。
 
@@ -22,7 +24,7 @@ GitHub 下载不畅时，可尝试 [备用加速下载 1](https://ghfast.top/htt
 
 ## 使用
 
-运行 dist/Snapline.exe。ZIP 请先完整解压，保留同目录的 Snapline.exe.config。已在本机 Windows 10（10.0.19045）验证，目标为 Windows 10/11 和 .NET Framework 4.8。程序约 122 KB，使用系统运行库，无需另装开发工具。
+运行 dist/Snapline.exe。ZIP 请先完整解压，保留同目录的 Snapline.exe.config。已在本机 Windows 10（10.0.19045）验证，目标为 Windows 10/11 和 .NET Framework 4.8。程序约 130 KB，使用系统运行库，无需另装开发工具。
 
 | 操作 | 效果 |
 | --- | --- |
@@ -32,7 +34,7 @@ GitHub 下载不畅时，可尝试 [备用加速下载 1](https://ghfast.top/htt
 | 「操作提示」卡片里的截图按钮、托盘截图菜单 | 只截图并复制，不自动挂上晾台 |
 | 微信截图、Win+Shift+S、普通复制图片 | 可以照常使用，不自动加入晾台 |
 | 挂在图片右边的「操作提示」 | 悬停弹出说明 |
-| 鼠标停在屏幕顶部约 0.3 秒 | 临时展开，离开约 0.7 秒收起 |
+| 鼠标在顶部蓝线附近停留约 0.2 秒 | 临时展开，离开约 0.7 秒收起 |
 | 双击托盘图标或托盘「展开 / 收起」 | 临时展开，预留 3 秒供鼠标移入晾台 |
 | 托盘「固定显示」 | 勾选保持显示，取消恢复自动收起 |
 | Ctrl+Alt+T | 展开并固定显示 / 收起 |
@@ -65,11 +67,11 @@ Ctrl+B 也常用于软件的加粗功能；本程序运行时优先响应截图�
 - 便签没有 60 张截图的数量限制，清空截图不删除便签。刚新建的空白便签关闭后会丢弃；每张最多支持 20000 个字符。
 - 保存失败时编辑窗口保留当前文字并提示重试；原便签文件无法读取时会保留文件，避免覆盖原记录。
 - 没有设置开机启动，没有修改 Windows 截图设置。再次运行同一 EXE 会临时展开或收起已有进程。
-- 多屏及混合 DPI 有边界适配，本轮实际截图仅在当前显示器验证。第三方应用的粘贴、拖放取决于对方支持的格式。
+- 顶部悬停使用桌面物理坐标，已对 100%–300% 缩放、多屏负坐标、顶部任务栏及鼠标抖动做逻辑验证；实际悬停在本机显示器验证。多屏及混合 DPI 的其他电脑需实际使用确认，本轮实际截图仅在当前显示器验证。第三方应用的粘贴、拖放取决于对方支持的格式。
 
 ## 编译和验证
 
-用 PowerShell 运行 build.ps1，调用 Windows 自带 .NET Framework 编译器，输出至 dist。源码为 src/Snapline.cs、src/RegionCapture.cs、src/Memo.cs、src/Shortcut.cs、src/ShortcutEditor.cs 和 src/Integration.cs。本地构建，未做数字签名。
+用 PowerShell 运行 build.ps1，调用 Windows 自带 .NET Framework 编译器，输出至 dist。源码为 src/Snapline.cs、src/RegionCapture.cs、src/Memo.cs、src/Shortcut.cs、src/ShortcutEditor.cs、src/Hover.cs 和 src/Integration.cs。本地构建，未做数字签名。
 
 tests/verify.ps1 验证便签持久化与保存失败处理、自定义快捷键录入、占用和保存失败回退、取消与重启恢复、截图存储、来源筛选、剪贴板输出格式、取消及过期结果、缓存编辑、自动收起、固定显示和快捷键占用。运行前退出本程序以释放全局快捷键。
 
@@ -77,7 +79,7 @@ tests/capture-selection.ps1 用 Windows PowerShell 的 STA 模式运行，验证
 
 tests/memo-ui.ps1 用 Windows PowerShell -STA 运行，在独立示例目录验证新建、纸色、完成保存及删除确认。测试短暂移动鼠标，结束时恢复位置；不写入剪贴板。
 
-结果见 tests/store-results.txt、tests/memo-results.txt、tests/integration-results.txt、tests/hotkey-results.txt、tests/selection-results.txt 和 tests/ui-0.5.0-verification.md；自定义快捷键及 0.5.1 验证见 tests/shortcut-results.txt、tests/release-0.5.1-results.txt。
+结果见 tests/store-results.txt、tests/memo-results.txt、tests/integration-results.txt、tests/hotkey-results.txt、tests/selection-results.txt 和 tests/ui-0.5.0-verification.md；自定义快捷键及 0.5.1 验证见 tests/shortcut-results.txt、tests/release-0.5.1-results.txt。0.5.2 顶部悬停验证见 tests/hover-results.txt 和 tests/release-0.5.2-results.txt。
 
 ## 来源与致谢
 

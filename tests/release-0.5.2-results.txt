@@ -1,0 +1,11 @@
+﻿Snapline Windows 0.5.2 verification - 2026-10-10
+PASS: old fullscreen bounds heuristic reproduces a false match for the actual Progman desktop
+PASS: desktop/WorkerW and normal maximized windows no longer suppress hover
+PASS: genuine borderless fullscreen classification still suppresses passive edge activation
+PASS: trigger geometry at 100/125/150/175/200/250/300 percent scale, negative screen coordinates and top taskbar offsets
+PASS: pointer jitter is tolerated and leaving/switching monitors resets dwell
+PASS: actual cursor hover near the blue indicator opens over the desktop without changing keyboard focus
+PASS: leaving auto-collapses; hover resumes after fullscreen suppression ends
+PASS: complete store, memo, capture/integration, custom recorder and hotkey conflict regression suite
+PASS: local app upgraded to 0.5.2; existing screenshots, notes and shortcut settings hashes unchanged
+PASS: portable archive matches installed dist files and includes attribution
