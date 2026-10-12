@@ -42,7 +42,7 @@ $arguments = @('/nologo','/target:winexe','/platform:anycpu','/optimize+','/utf8
     ('/out:' + (Join-Path $dist 'Snapline.exe')),
     ('/win32manifest:' + (Join-Path $projectRoot 'app.manifest')),
     ('/win32icon:' + $iconFile)
-) + $references + (Join-Path $projectRoot 'src\Snapline.cs'), (Join-Path $projectRoot 'src\Integration.cs'), (Join-Path $projectRoot 'src\RegionCapture.cs'), (Join-Path $projectRoot 'src\Memo.cs'), (Join-Path $projectRoot 'src\Shortcut.cs'), (Join-Path $projectRoot 'src\ShortcutEditor.cs'), (Join-Path $projectRoot 'src\ShortcutTests.cs'), (Join-Path $projectRoot 'src\Hover.cs'), (Join-Path $projectRoot 'src\HoverTests.cs'), (Join-Path $projectRoot 'src\Startup.cs'), (Join-Path $projectRoot 'src\StartupTests.cs')
+) + $references + (Join-Path $projectRoot 'src\Snapline.cs'), (Join-Path $projectRoot 'src\Integration.cs'), (Join-Path $projectRoot 'src\RegionCapture.cs'), (Join-Path $projectRoot 'src\Memo.cs'), (Join-Path $projectRoot 'src\Shortcut.cs'), (Join-Path $projectRoot 'src\ShortcutEditor.cs'), (Join-Path $projectRoot 'src\ShortcutTests.cs'), (Join-Path $projectRoot 'src\Hover.cs'), (Join-Path $projectRoot 'src\HoverTests.cs'), (Join-Path $projectRoot 'src\Startup.cs'), (Join-Path $projectRoot 'src\StartupTests.cs'), (Join-Path $projectRoot 'src\Remark.cs'), (Join-Path $projectRoot 'src\RemarkTests.cs')
 & $csc @arguments
 if ($LASTEXITCODE -ne 0) { throw '编译失败。' }
 Copy-Item -LiteralPath (Join-Path $projectRoot 'Snapline.exe.config') -Destination $dist -Force

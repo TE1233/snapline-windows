@@ -1,0 +1,19 @@
+﻿Snapline Windows 0.5.4 verification - 2026-10-12
+PASS: screenshot legacy metadata loads with empty remarks; Unicode/emoji/multiline remarks persist across restart
+PASS: failed remark saves roll back previous content; overlong/removed-shot updates rejected; PNG bytes and creation order remain unchanged
+PASS: real WPF screenshot paper-strip entry does not automatically open an editor or take foreground focus
+PASS: explicit paper entry opens a small focused editor; Enter saves, Esc cancels, enlarged preview displays complete remark
+PASS: save failure retains editor/text and permits retry; clearing restores add entry; image context menu opens editor
+PASS: full long remark is bounded and scrollable; mouse wheel over the image scrolls text
+PASS: app exit saves an active remark draft; failed save prevents exit and keeps text/editor
+PASS: only actual visible line bounds trigger opening; actual mouse at other screen-top positions or below the line stays collapsed
+PASS: line hit geometry at 100/125/150/175/200/250/300 percent DPI, negative screen origins and top taskbar offsets
+PASS: leaving line resets dwell; desktop/maximized classification, fullscreen suppression and automatic collapse preserved
+PASS: store/memo persistence and current-user startup regression tests passed
+PASS: global shortcut conflicts, alternate presets and disabled shortcut state verified
+PASS: local app upgraded; original screenshot pixels/metadata, notes, settings and enabled startup preserved
+PASS: final installed EXE matches tested candidate; final restart leaves existing data hashes unchanged
+PASS: own-fixture editor, hanging paper strip and full preview images visually inspected
+LIMIT: old clipboard integration stopped before any writes because existing clipboard format could not be read (CLIPBRD_E_BAD_DATA); user clipboard was not cleared/replaced
+LIMIT: old native key-recorder regression stopped before key injection when its window did not have foreground focus
+LIMIT: physical hover verified on this monitor; other DPI/monitor geometries tested logically; no whole-computer reboot was performed

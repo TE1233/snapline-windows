@@ -42,7 +42,7 @@ namespace Snapline
         { this.store = store; this.entry = entry; this.executable = executable; }
         internal static bool ManagesSystemStartup(string[] args)
         {
-            return !args.Any(x => x == "--data-dir" || x == "--demo" || x == "--demo-notes" || x == "--no-capture" || x.EndsWith("-test", StringComparison.Ordinal));
+            return !args.Any(x => x == "--data-dir" || x == "--demo" || x == "--demo-notes" || x == "--demo-remarks" || x == "--no-capture" || x.EndsWith("-test", StringComparison.Ordinal));
         }
         internal static string Command(string executable)
         {

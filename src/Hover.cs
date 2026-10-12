@@ -4,31 +4,31 @@ using System.Text;
 
 namespace Snapline
 {
-    // Uses physical desktop coordinates. A slightly wider band avoids missing the visible line.
+    // The hit rectangle is the visible collapsed blue indicator, in physical desktop pixels.
     sealed class TopHoverGate
     {
-        string monitor;
-        int top, left;
-        DateTime entered, lastSeen;
+        internal const double IndicatorWidth = 68, IndicatorHeight = 2;
         internal const int DwellMilliseconds = 200;
-        internal static int TriggerHeight(double dpi) { return Math.Max(12, (int)Math.Ceiling(8 * Math.Max(1, dpi))); }
-        internal void Reset() { monitor = null; entered = lastSeen = DateTime.MinValue; }
+        string monitor;
+        Rectangle previous;
+        DateTime entered;
+        internal static Rectangle IndicatorBounds(Rectangle area, double dpi)
+        {
+            dpi = dpi > 0 ? dpi : 1;
+            int width = Math.Min(area.Width, Math.Max(1, (int)Math.Round(IndicatorWidth * dpi)));
+            int height = Math.Max(1, (int)Math.Round(IndicatorHeight * dpi));
+            return new Rectangle(area.Left + (area.Width - width) / 2, area.Top, width, height);
+        }
+        internal void Reset() { monitor = null; entered = DateTime.MinValue; }
         internal bool Observe(string device, Rectangle area, int x, int y, double dpi, DateTime now)
         {
-            int band = TriggerHeight(dpi);
-            bool same = monitor == device && top == area.Top && left == area.Left;
-            bool horizontal = x >= area.Left && x < area.Right;
-            bool inside = horizontal && y >= area.Top && y < area.Top + band;
-            if (!inside)
-            {
-                // Keep dwell progress through one brief, small pointer wobble, without opening outside the band.
-                if (same && horizontal && y >= area.Top && y < area.Top + band + 4 &&
-                    (now - lastSeen).TotalMilliseconds <= 120) return false;
-                Reset(); return false;
-            }
-            if (!same || entered == DateTime.MinValue || now < entered)
-            { monitor = device; top = area.Top; left = area.Left; entered = now; }
-            lastSeen = now;
+            return ObserveLine(device, IndicatorBounds(area, dpi), x, y, now);
+        }
+        internal bool ObserveLine(string device, Rectangle line, int x, int y, DateTime now)
+        {
+            if (!line.Contains(x, y)) { Reset(); return false; }
+            if (monitor != device || previous != line || entered == DateTime.MinValue || now < entered)
+            { monitor = device; previous = line; entered = now; }
             return (now - entered).TotalMilliseconds >= DwellMilliseconds;
         }
     }

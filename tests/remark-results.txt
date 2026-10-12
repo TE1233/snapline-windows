@@ -1,0 +1,8 @@
+﻿PASS: legacy screenshot migration and Unicode/emoji/multiline remark persistence across restart
+PASS: save failure rolls back; overlong and removed-shot updates are rejected; PNG bytes, creation order, notes and shortcuts unchanged
+PASS: adding a screenshot shows a paper-strip entry and does not automatically open an editor or steal focus
+PASS: paper entry opens a focused small editor; Enter saves, full preview includes remark, Esc cancels changes
+PASS: save failure keeps input/window/old remark; retry saves successfully
+PASS: image context menu opens remark editor; clearing restores add entry; copy/drag source PNG remains byte-identical
+PASS: full long remark remains scrollable in a bounded preview; mouse wheel over image scrolls text
+PASS: app exit saves an active draft; save failure cancels app exit and retains editor text

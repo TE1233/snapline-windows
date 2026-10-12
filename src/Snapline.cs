@@ -28,7 +28,7 @@ using Path = System.IO.Path;
 
 [assembly: System.Reflection.AssemblyTitle("Snapline - 截图晾台")]
 [assembly: System.Reflection.AssemblyDescription("Private, local screenshot shelf for Windows")]
-[assembly: System.Reflection.AssemblyVersion("0.5.3.0")]
+[assembly: System.Reflection.AssemblyVersion("0.5.4.0")]
 
 namespace Snapline
 {
@@ -69,6 +69,7 @@ namespace Snapline
         [DataMember] public string File;
         [DataMember] public string Digest;
         [DataMember] public string Label;
+        [DataMember] public string Remark;
         [DataMember] public DateTime Created;
         internal BitmapSource Thumb;
     }
@@ -124,6 +125,7 @@ namespace Snapline
                         var image = Load(FullPath(shot));
                         shot.Digest = Hash(image);
                         shot.Thumb = Thumbnail(image);
+                        shot.Remark = shot.Remark ?? "";
                         Items.Add(shot);
                     }
                 }
@@ -280,6 +282,7 @@ namespace Snapline
         readonly Store store;
         readonly bool noCapture, demo;
         readonly Canvas canvas = new Canvas();
+        FrameworkElement indicator;
         readonly DispatcherTimer tick = new DispatcherTimer();
 
         readonly Dictionary<string, DateTime> pending = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
@@ -335,7 +338,7 @@ namespace Snapline
             store.Changed = delegate { int count = store.Items.Count + store.Notes.Count; if (count > knownCount) page = 0; knownCount = count; Render(); };
             canvas.MouseWheel += delegate(object sender, MouseWheelEventArgs e) { if (expanded) { ChangePage(e.Delta < 0 ? 1 : -1); e.Handled = true; } };
             SourceInitialized += Initialize;
-            Closing += delegate(object sender, System.ComponentModel.CancelEventArgs e) { if (memoEditor != null && !memoEditor.FlushChanges()) e.Cancel = true; };
+            Closing += delegate(object sender, System.ComponentModel.CancelEventArgs e) { if (memoEditor != null && !memoEditor.FlushChanges()) e.Cancel = true; if (remarkEditor != null && !remarkEditor.TrySave()) e.Cancel = true; };
             Closed += Cleanup;
             AllowDrop = true;
             DragOver += delegate(object sender, DragEventArgs e) { e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None; e.Handled = true; };
@@ -440,6 +443,13 @@ namespace Snapline
             canvas.Height = open ? 270 : 4;
             if (changed) page = 0;
         }
+        internal Drawing.Rectangle IndicatorHitBounds()
+        {
+            if (indicator == null || expanded || !IsLoaded) return Drawing.Rectangle.Empty;
+            var first = indicator.PointToScreen(new System.Windows.Point(0, 0));
+            var last = indicator.PointToScreen(new System.Windows.Point(indicator.ActualWidth, indicator.ActualHeight));
+            return Drawing.Rectangle.FromLTRB((int)Math.Round(first.X), (int)Math.Round(first.Y), (int)Math.Round(last.X), (int)Math.Round(last.Y));
+        }
         bool Fullscreen(Forms.Screen target = null)
         {
             IntPtr foreground = ForegroundWindow();
@@ -453,7 +463,6 @@ namespace Snapline
             if (dialogOpen || dragging || helpReading || capturePending) { hoverGate.Reset(); return; }
             Native.Point p; if (!Native.GetCursorPos(out p)) { hoverGate.Reset(); return; }
             Forms.Screen under = Forms.Screen.FromPoint(new Drawing.Point(p.X, p.Y));
-            var area = under.WorkingArea;
             DateTime now = DateTime.Now;
             if (!demo && Fullscreen(under))
             {
@@ -463,12 +472,7 @@ namespace Snapline
             }
             if ((imageTip != null && imageTip.IsOpen) || (noteTip != null && noteTip.IsOpen)) { lastInside = now; return; }
             if (now < hideUntil) hoverGate.Reset();
-            else if (hoverGate.Observe(under.DeviceName, area, p.X, p.Y, screen.DeviceName == under.DeviceName ? Dpi() : 1, now) &&
-                (!expanded || screen.DeviceName != under.DeviceName))
-            {
-                if (screen.DeviceName != under.DeviceName) { Position(expanded, under); Render(); }
-                Reveal();
-            }
+            else if (!expanded && hoverGate.ObserveLine(screen.DeviceName, IndicatorHitBounds(), p.X, p.Y, now)) Reveal();
             bool inside = expanded && p.X >= screen.WorkingArea.Left && p.X < screen.WorkingArea.Right &&
                 p.Y >= screen.WorkingArea.Top && p.Y < screen.WorkingArea.Top + 266 * Dpi();
             if (inside) lastInside = now;
@@ -603,7 +607,7 @@ namespace Snapline
             if (collect && !noCapture)
             {
                 store.Add(image, "晾台截图");
-                Notify(copied ? "截图已挂上晾台，并复制到剪贴板。" : "截图已挂上晾台；剪贴板暂时被占用，可单击图片重试复制。");
+                Notify(copied ? "截图已挂上并复制。点击图片下方「＋ 添加备注」记一下用途。" : "截图已挂上晾台；剪贴板暂时被占用，可单击图片重试复制。");
             }
             else Notify(copied ? (ShortcutCollects ? "截图已复制。自动挂上晾台请使用 " + CaptureShortcutLabel + "。" :
                 "截图已复制。自动挂上请在托盘选择 Ctrl+B 或自定义快捷键。") : "剪贴板被占用，截图未复制，请重试。");
@@ -618,7 +622,8 @@ namespace Snapline
             if (!CaptureHotkeyRegistered && store.Settings.CaptureShortcut != "None")
                 content.Children.Add(new TextBlock { Text = CaptureShortcutLabel + " 已被占用，可在托盘更换", FontSize = 10, Foreground = Brush("#FF9C6A3B"), Margin = new Thickness(0, 0, 0, 7) });
             AddHelpRow(content, "卡片截图按钮", "只复制，不自动挂上晾台");
-            AddHelpRow(content, "鼠标移到顶部", "临时展开晾台");
+            AddHelpRow(content, "触碰顶部蓝线", "在线条上停留约 0.2 秒展开");
+            AddHelpRow(content, "图片下方小纸条", "添加或修改截图用途备注");
             AddHelpRow(content, "Ctrl + Alt + T", "固定展开 / 收起");
             AddHelpRow(content, "＋ 便签", "随手记录，自动保存到本机");
             AddHelpRow(content, "双击便签", "编辑内容与纸色，右键复制或删除");
@@ -712,7 +717,7 @@ namespace Snapline
             dialogOpen = true;
             try
             {
-                Forms.MessageBox.Show("截图晾台 Snapline 0.5.3\n\n" + CaptureShortcutLabel + "：框选截图（需快捷键可用）。\n图片右侧「操作提示」：悬停查看说明，点击内部按钮仅截图并复制。\nWin + Shift + S 和其他软件截图不会自动加入。\nCtrl + Alt + T：展开 / 收起，展开后保持显示。\n双击托盘图标：临时展开，离开后自动收起。\n托盘「固定显示」：勾选保持显示，取消后恢复自动收起。\n托盘「开机启动」：首次运行自动启用，取消后记住；登录 Windows 后收起运行。\n鼠标停在屏幕顶部：临时展开。\n单击图片：复制。双击：查看。\n拖出：复制为文件。按 Shift 拖到文件夹：移动。\n长按图片：用画图编辑。右键：更多操作。\n\n默认 Ctrl+B 或自定义快捷键发起的框选截图会自动加入。微信截图、普通复制图片和外部截图文件夹均不自动收集。\n最多保留 60 张，超过后清理最早的应用副本。\n完全本地运行，不联网、不上传、不修改系统截图设置。", "截图晾台", Forms.MessageBoxButtons.OK, Forms.MessageBoxIcon.Information);
+                Forms.MessageBox.Show("截图晾台 Snapline 0.5.4\n\n" + CaptureShortcutLabel + "：框选截图（需快捷键可用）。\n图片右侧「操作提示」：悬停查看说明，点击内部按钮仅截图并复制。\nWin + Shift + S 和其他软件截图不会自动加入。\nCtrl + Alt + T：展开 / 收起，展开后保持显示。\n双击托盘图标：临时展开，离开后自动收起。\n托盘「固定显示」：勾选保持显示，取消后恢复自动收起。\n托盘「开机启动」：首次运行自动启用，取消后记住；登录 Windows 后收起运行。\n鼠标停在顶部中央蓝线上约 0.2 秒：临时展开。\n图片下方「＋ 添加备注」或小纸条：记录截图用途；Enter 保存，Esc 取消。\n单击图片：复制。双击：查看。\n拖出：复制为文件。按 Shift 拖到文件夹：移动。\n长按图片：用画图编辑。右键：更多操作。\n\n默认 Ctrl+B 或自定义快捷键发起的框选截图会自动加入。微信截图、普通复制图片和外部截图文件夹均不自动收集。\n最多保留 60 张，超过后清理最早的应用副本。\n完全本地运行，不联网、不上传、不修改系统截图设置。", "截图晾台", Forms.MessageBoxButtons.OK, Forms.MessageBoxIcon.Information);
             }
             finally { dialogOpen = false; }
         }
@@ -842,6 +847,7 @@ namespace Snapline
             menu.Items.Add(Item("复制图片", delegate { Copy(shot); }));
             menu.Items.Add(Item("复制 PNG 文件", delegate { CopyFile(shot); }));
             menu.Items.Add(Item("打开图片", delegate { Launch(store.FullPath(shot)); }));
+            menu.Items.Add(Item(String.IsNullOrWhiteSpace(shot.Remark) ? "添加截图备注…" : "编辑截图备注…", delegate { menu.IsOpen = false; dialogOpen = false; Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, new Action(delegate { EditRemark(shot, null); })); }));
             menu.Items.Add(Item("用画图编辑", delegate { Edit(shot); }));
             menu.Items.Add(Item("另存为…", delegate { SaveAs(shot); }));
             menu.Items.Add(Item("在文件夹中显示", delegate { Process.Start("explorer.exe", "/select,\"" + store.FullPath(shot) + "\""); }));
@@ -921,11 +927,12 @@ namespace Snapline
         {
             CloseImagePreview(); CloseNotePreview();
             if (helpTip != null) helpTip.IsOpen = false;
-            canvas.Children.Clear();
+            canvas.Children.Clear(); indicator = null;
             if (!expanded)
             {
-                var mark = new Border { Width = 68, Height = 2, CornerRadius = new CornerRadius(1), Background = Brush("#D671C6FA"), ToolTip = "鼠标在蓝线附近稍停即可展开 · 图片旁「操作提示」查看说明" };
-                Place(mark, Math.Max(0, (shelfWidth - 68) / 2), 0);
+                var mark = new Border { Width = TopHoverGate.IndicatorWidth, Height = TopHoverGate.IndicatorHeight, CornerRadius = new CornerRadius(1), Background = Brush("#D671C6FA"), ToolTip = "鼠标触碰这条蓝线稍停即可展开 · 图片旁「操作提示」查看说明" };
+                indicator = mark;
+                Place(mark, Math.Max(0, (shelfWidth - TopHoverGate.IndicatorWidth) / 2), 0);
                 return;
             }
             page = Math.Min(page, Math.Max(0, (Deck().Count - 1) / CardsPerPage()));
@@ -1070,7 +1077,8 @@ namespace Snapline
         {
             double dpi = Dpi();
             double maxWidth = Math.Max(100, Math.Min(760, screen.WorkingArea.Width / dpi - 64));
-            double maxHeight = Math.Max(80, Math.Min(460, screen.WorkingArea.Height / dpi - 300));
+            double remarkBudget = String.IsNullOrWhiteSpace(shot.Remark) ? 0 : Math.Max(48, Math.Min(140, screen.WorkingArea.Height / dpi / 5));
+            double maxHeight = Math.Max(80, Math.Min(460, screen.WorkingArea.Height / dpi - 300 - remarkBudget));
             double aspect = shot.Thumb.PixelWidth / (double)Math.Max(1, shot.Thumb.PixelHeight);
             double width = Math.Min(maxWidth, maxHeight * aspect), height = width / aspect;
             double bodyWidth = Math.Max(180, width);
@@ -1079,7 +1087,19 @@ namespace Snapline
             var title = Text("放大预览", 12, "#FF387DA6");
             title.Margin = new Thickness(0, 0, 0, 8); content.Children.Add(title);
             content.Children.Add(new Border { Child = preview, Background = Brush("#FFF0F4F8"), CornerRadius = new CornerRadius(4), ClipToBounds = true });
-            content.Children.Add(new TextBlock { Text = "单击复制 · 双击查看 · 拖出图片", FontSize = 11,
+            if (remarkBudget > 0)
+            {
+                var remarkText = new TextBlock { Text = shot.Remark, FontSize = 13, LineHeight = 20, TextWrapping = TextWrapping.Wrap,
+                    Foreground = Brush("#FF6D6042") };
+                AutomationProperties.SetAutomationId(remarkText, "PreviewRemark");
+                var scroll = new ScrollViewer { Content = remarkText, MaxHeight = remarkBudget, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+                content.Children.Add(new Border { Child = scroll, Padding = new Thickness(10, 8, 10, 8), Margin = new Thickness(0, 9, 0, 0),
+                    CornerRadius = new CornerRadius(5), Background = Brush("#FFFFF7DD"), BorderBrush = Brush("#FFEBDDB6"), BorderThickness = new Thickness(1) });
+                target.PreviewMouseWheel += delegate(object sender, MouseWheelEventArgs e)
+                { if (imageTip != null && imageTip.IsOpen && imageTip.PlacementTarget == target) { scroll.ScrollToVerticalOffset(scroll.VerticalOffset - e.Delta / 3.0); e.Handled = true; } };
+            }
+            content.Children.Add(new TextBlock { Text = "单击复制 · 双击查看 · 拖出图片" + (remarkBudget > 0 ? " · 滚轮查看长备注" : ""), FontSize = 11,
                 Foreground = Brush("#FF82909B"), Margin = new Thickness(0, 8, 0, 0), TextWrapping = TextWrapping.Wrap });
             var tip = new ToolTip
             {
@@ -1114,17 +1134,20 @@ namespace Snapline
         void MakeCard(Shot shot, double center, double y, int index)
         {
             double imageWidth = Math.Max(1, shot.Thumb.PixelWidth), imageHeight = Math.Max(1, shot.Thumb.PixelHeight);
-            double scale = Math.Min(192 / imageWidth, 144 / imageHeight);
+            double scale = Math.Min(192 / imageWidth, 124 / imageHeight);
             double width = Math.Max(70, imageWidth * scale) + 7;
             double height = Math.Max(54, imageHeight * scale) + 7;
             double lean = new[] { -2.2, 1.4, -1.1, 2.0, -0.6 }[index % 5];
-            var swing = new RotateTransform(lean, width / 2, -15);
+            double cardWidth = Math.Max(142, width);
+            var swing = new RotateTransform(lean, cardWidth / 2, -15);
+            var card = new Grid { Width = cardWidth, Height = height + 51, RenderTransform = swing };
             var grid = new Grid
             {
-                Width = width, Height = height, RenderTransform = swing,
+                Width = width, Height = height, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top,
                 Cursor = Cursors.Hand
             };
             AutomationProperties.SetName(grid, "悬挂图片 " + shot.Label);
+            AutomationProperties.SetAutomationId(grid, "ShotCard-" + shot.File);
             grid.ToolTip = ImagePopup(shot, grid);
             ToolTipService.SetInitialShowDelay(grid, 300);
             ToolTipService.SetBetweenShowDelay(grid, 100);
@@ -1210,7 +1233,9 @@ namespace Snapline
                 down = false; e.Handled = true;
             };
             grid.LostMouseCapture += delegate { hold.Stop(); };
-            Place(grid, center - width / 2, y);
+            card.Children.Add(grid);
+            card.Children.Add(RemarkStrip(shot, cardWidth, height));
+            Place(card, center - cardWidth / 2, y);
         }
 
         internal void Snapshot(string file)
@@ -1256,6 +1281,7 @@ namespace Snapline
                 if (args.Contains("--shortcut-test")) return ShortcutTests.Run(root);
                 if (args.Contains("--hover-test")) return HoverTests.Run(root);
                 if (args.Contains("--startup-test")) return StartupTests.Run(root);
+                if (args.Contains("--remark-test")) return RemarkTests.Run(root);
                 bool fresh;
                 using (var mutex = new Mutex(true, "Local\\Snapline-" + BitConverter.ToString(SHA256.Create().ComputeHash(Encoding.UTF8.GetBytes(Path.GetFullPath(root)))).Replace("-", "").Substring(0, 20), out fresh))
                 {
@@ -1279,6 +1305,11 @@ namespace Snapline
                         store.AddNote("周末的小计划\\n去公园走走，带上相机。\\n\\n给自己留一点慢下来的时间。".Replace("\\n", "\n"), "Butter");
                         store.AddNote("今天先做这几件事\\n整理资料、回一封邮件，\\n再给新想法留个位置。".Replace("\\n", "\n"), "Mint");
                         store.AddNote("一个小灵感\\n把想到的事情写下来，\\n让它像照片一样晾着。".Replace("\\n", "\n"), "Lavender");
+                    }
+                    if (demo && args.Contains("--demo-remarks") && store.Items.Count > 0)
+                    {
+                        string[] examples = { "周五做方案时，参考这个布局。", "今天的小灵感，留给下次创作。", "这是项目需要的配色，记得和同事确认。" };
+                        for (int i = 0; i < store.Items.Count; i++) store.UpdateRemark(store.Items[i], examples[i % examples.Length]);
                     }
                     var shelf = new Shelf(store, args.Contains("--no-capture"), demo);
                     shelf.StartCollapsed = args.Contains("--startup");

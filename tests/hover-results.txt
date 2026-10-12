@@ -1,6 +1,7 @@
 ﻿PASS: desktop and framed/maximized apps are allowed; genuine borderless fullscreen still suppresses hover
-PASS: 100/125/150/175/200/250/300 percent scaling geometry, negative origins, taskbar offsets, jitter and monitor dwell reset
-PASS: actual Windows desktop window is excluded from fullscreen suppression
-PASS: actual cursor hover near blue indicator opens over desktop without stealing keyboard focus
-PASS: fullscreen suppresses accidental opening; returning to desktop resumes hover without moving pointer away
+PASS: only the centered 68x2 logical-pixel line activates at 100/125/150/175/200/250/300 percent DPI; negative origins and taskbar offsets work
+PASS: left/right/below-line pixels do not activate; exiting the line and monitor changes reset dwell immediately
+PASS: actual mouse touching screen top away from line, or just below the centered line, stays collapsed
+PASS: actual cursor touching the rendered blue line opens over desktop without stealing keyboard focus
+PASS: fullscreen suppresses accidental opening; returning to desktop resumes line hover
 PASS: automatic collapse after leaving remains intact
