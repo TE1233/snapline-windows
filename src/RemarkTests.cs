@@ -26,6 +26,8 @@ namespace Snapline
         }
         static Button FindButton(Shelf shelf, Shot shot)
         { return Descendants((DependencyObject)shelf.Content).OfType<Button>().First(x => AutomationProperties.GetAutomationId(x) == "Remark-" + shot.File); }
+        static RemarkText StripText(Shelf shelf, Shot shot)
+        { return Descendants((DependencyObject)FindButton(shelf, shot).Content).OfType<RemarkText>().First(); }
         static void Click(Button button) { ((IInvokeProvider)new ButtonAutomationPeer(button).GetPattern(PatternInterface.Invoke)).Invoke(); }
         static void Key(RemarkEditor editor, System.Windows.Input.Key key)
         {
@@ -87,7 +89,7 @@ namespace Snapline
                     if (phase == 0)
                     {
                         Require(editor == null && Native.GetForegroundWindow() == foreground, "Remark entry opened/activated an editor automatically.");
-                        Require((FindButton(shelf, shot).Content as TextBlock).Text.Contains("添加备注"), "Blank screenshot lacks add entry.");
+                        Require(StripText(shelf, shot).Text.Contains("添加备注"), "Blank screenshot lacks add entry.");
                         report.Add("PASS: adding a screenshot shows a paper-strip entry and does not automatically open an editor or steal focus");
                         Click(FindButton(shelf, shot)); phase = 1;
                     }
@@ -101,7 +103,7 @@ namespace Snapline
                     else if (phase == 2 && editor == null)
                     {
                         Require(shot.Remark == sample && new Store(root).Items[0].Remark == sample, "Enter failed to save/reload remark.");
-                        Require((FindButton(shelf, shot).Content as TextBlock).Text == sample, "Saved paper strip not updated.");
+                        Require(StripText(shelf, shot).Text == sample.Replace("\n", " "), "Saved single-line paper strip not updated.");
                         shelf.Snapshot(Path.Combine(root, "remark-shelf-preview.png"));
                         var card = Descendants((DependencyObject)shelf.Content).OfType<Grid>().First(x => AutomationProperties.GetAutomationId(x) == "ShotCard-" + shot.File);
                         preview = (ToolTip)card.ToolTip;
@@ -144,9 +146,9 @@ namespace Snapline
                     }
                     else if (phase == 8 && editor != null && editor.IsLoaded)
                     { editor.Input.Text = ""; editor.SaveAndClose(); phase = 9; }
-                    else if (phase == 9 && editor == null)
+                    else if (phase == 9 && editor == null && shelf.FlyingCount == 0 && shelf.HoverPreviewAllowed)
                     {
-                        Require(String.IsNullOrEmpty(shot.Remark) && (FindButton(shelf, shot).Content as TextBlock).Text.Contains("添加备注"), "Clear did not restore add entry.");
+                        Require(String.IsNullOrEmpty(shot.Remark) && StripText(shelf, shot).Text.Contains("添加备注"), "Clear did not restore add entry.");
                         store.UpdateRemark(shot, sample);
                         Require(File.ReadAllBytes(store.FullPath(shot)).SequenceEqual(png), "UI editing changed exported source PNG.");
                         report.Add("PASS: image context menu opens remark editor; clearing restores add entry; copy/drag source PNG remains byte-identical");

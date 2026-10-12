@@ -5,13 +5,9 @@ using System.Text;
 namespace Snapline
 {
     // The hit rectangle is the visible collapsed blue indicator, in physical desktop pixels.
-    sealed class TopHoverGate
+    static class TopHoverGate
     {
         internal const double IndicatorWidth = 68, IndicatorHeight = 2;
-        internal const int DwellMilliseconds = 200;
-        string monitor;
-        Rectangle previous;
-        DateTime entered;
         internal static Rectangle IndicatorBounds(Rectangle area, double dpi)
         {
             dpi = dpi > 0 ? dpi : 1;
@@ -19,17 +15,9 @@ namespace Snapline
             int height = Math.Max(1, (int)Math.Round(IndicatorHeight * dpi));
             return new Rectangle(area.Left + (area.Width - width) / 2, area.Top, width, height);
         }
-        internal void Reset() { monitor = null; entered = DateTime.MinValue; }
-        internal bool Observe(string device, Rectangle area, int x, int y, double dpi, DateTime now)
+        internal static bool Contains(Rectangle area, int x, int y, double dpi)
         {
-            return ObserveLine(device, IndicatorBounds(area, dpi), x, y, now);
-        }
-        internal bool ObserveLine(string device, Rectangle line, int x, int y, DateTime now)
-        {
-            if (!line.Contains(x, y)) { Reset(); return false; }
-            if (monitor != device || previous != line || entered == DateTime.MinValue || now < entered)
-            { monitor = device; previous = line; entered = now; }
-            return (now - entered).TotalMilliseconds >= DwellMilliseconds;
+            return IndicatorBounds(area, dpi).Contains(x, y);
         }
     }
 

@@ -1,28 +1,20 @@
-﻿# 截图晾台 Snapline — Windows 版
+# 截图晾台 Snapline — Windows 版
 
-0.5.4 新增截图用途备注：框选完成后，图片下方提供「＋ 添加备注」，点击打开小输入框，Enter 保存、Shift+Enter 换行、Esc 取消。备注显示为浅色纸条，放大预览里显示全文，长备注可在图片上滚轮查看。原图复制和拖出保持原有像素。
+0.5.8 添加截图备注：点图片下方「添加备注」或已有纸条，记录这张截图的用途。Enter 保存、Shift+Enter 换行、Esc 取消；鼠标同时离开当前截图和备注窗口后会自动保存并收起。备注显示为图片下方的淡蓝色纸条，一行展示，放大预览里可查看全文，长备注支持滚轮查看。复制、拖出和另存为仍使用原图。
 
-顶部展开仅在鼠标触碰实际绘制的中央蓝线并停留约 0.2 秒时触发；顶部其他位置和蓝线下方不再触发，离开线条立即重置等待。
-
-0.5.3 新增开机启动：首次正常运行（包括旧版升级）自动为当前 Windows 用户启用，下次登录后收起运行。托盘「开机启动」可取消并记住选择。保留下述顶部蓝线展开修复。
-
-0.5.2 修复 Windows 桌面与普通最大化窗口被误判为全屏的问题。当前触发范围使用 0.5.4 的实际蓝线位置。
-
-0.5.1 新增自定义截图快捷键：右键托盘图标 → 截图快捷键 → 自定义，直接按下组合键后保存。支持 Ctrl、Shift、Alt 组合，保存时检查全局占用，重启后保留选择，操作提示同步显示。
-
-0.5.0 新增悬挂便签，提供暖黄、薄荷绿、淡紫三种纸色，自动保存到本机，重启后恢复。默认 Ctrl+B 或当前自定义快捷键发起的晾台截图会自动加入。使用晾台自己的框选界面，结果直接挂上天空蓝晾衣绳；微信截图、Windows 截图、普通复制图片及其他软件保存的截图文件均不会自动加入。
+截图和便签一起挂在天空蓝晾衣绳上，便签支持三种纸色并保存到本机。默认 Ctrl+B 或当前自定义快捷键发起的晾台截图会自动加入；微信截图、Windows 截图、普通复制图片及其他软件保存的截图文件均不会自动加入。
 
 独立 Windows 实现，交互灵感来自 [Tendedero](https://github.com/alejandrobujan/tendedero)。使用自行绘制的图标和新的名称。完全本地运行，不联网、不上传。
 
 ## 下载
 
-[Windows 便携版 0.5.4](https://github.com/TE1233/snapline-windows/releases/download/v0.5.4/Snapline-Windows-0.5.4-portable.zip) · [源码包 0.5.4](https://github.com/TE1233/snapline-windows/releases/download/v0.5.4/Snapline-Windows-0.5.4-source.zip)
+[Windows 便携版 0.5.8](https://github.com/TE1233/snapline-windows/releases/download/v0.5.8/Snapline-Windows-0.5.8-portable.zip) · [源码包 0.5.8](https://github.com/TE1233/snapline-windows/releases/download/v0.5.8/Snapline-Windows-0.5.8-source.zip)
 
-GitHub 下载不畅时，可尝试 [备用加速下载 1](https://ghfast.top/https://github.com/TE1233/snapline-windows/releases/download/v0.5.4/Snapline-Windows-0.5.4-portable.zip) · [备用加速下载 2](https://gh-proxy.com/https://github.com/TE1233/snapline-windows/releases/download/v0.5.4/Snapline-Windows-0.5.4-portable.zip)。
+GitHub 下载不畅时，可尝试 [备用加速下载 1](https://ghfast.top/https://github.com/TE1233/snapline-windows/releases/download/v0.5.8/Snapline-Windows-0.5.8-portable.zip) · [备用加速下载 2](https://gh-proxy.com/https://github.com/TE1233/snapline-windows/releases/download/v0.5.8/Snapline-Windows-0.5.8-portable.zip)。
 
 这两个入口无需注册，通过第三方服务转发 GitHub 原始发布文件。服务可用性可能变化；一个入口打不开时可尝试另一个。
 
-便携包 SHA-256：`e4cb6eaab56efb181df69f25f748613927605d8c0b7d1af50d046f2aa8c3be8c`
+便携包 SHA-256：`5bbe6a57ef83d290e89fe54fecb38181cebca233e94d0e7d603a813907136e59`
 
 完整解压便携版后，双击 Snapline.exe 即可运行。
 
@@ -30,7 +22,7 @@ GitHub 下载不畅时，可尝试 [备用加速下载 1](https://ghfast.top/htt
 
 ## 使用
 
-运行 dist/Snapline.exe。ZIP 请先完整解压，保留同目录的 Snapline.exe.config。已在本机 Windows 10（10.0.19045）验证，目标为 Windows 10/11 和 .NET Framework 4.8。程序约 160 KB，使用系统运行库，无需另装开发工具。
+运行 dist/Snapline.exe。ZIP 请先完整解压，保留同目录的 Snapline.exe.config。已在本机 Windows 10（10.0.19045）验证，目标为 Windows 10/11 和 .NET Framework 4.8。程序约 215 KB，使用系统运行库，无需另装开发工具。
 
 | 操作 | 效果 |
 | --- | --- |
@@ -40,12 +32,13 @@ GitHub 下载不畅时，可尝试 [备用加速下载 1](https://ghfast.top/htt
 | 「操作提示」卡片里的截图按钮、托盘截图菜单 | 只截图并复制，不自动挂上晾台 |
 | 微信截图、Win+Shift+S、普通复制图片 | 可以照常使用，不自动加入晾台 |
 | 挂在图片右边的「操作提示」 | 悬停弹出说明 |
-| 鼠标触碰顶部中央蓝线并停留约 0.2 秒 | 临时展开，离开约 0.7 秒收起 |
+| 鼠标触碰顶部中央蓝线 | 临时展开，离开约 0.7 秒收起 |
 | 双击托盘图标或托盘「展开 / 收起」 | 临时展开，预留 3 秒供鼠标移入晾台 |
 | 托盘「开机启动」 | 首次运行自动启用；可取消，之后保持关闭；登录时收起运行 |
 | 托盘「固定显示」 | 勾选保持显示，取消恢复自动收起 |
 | Ctrl+Alt+T | 展开并固定显示 / 收起 |
 | 图片下方「＋ 添加备注」或已有纸条 | 点击添加或修改截图用途，Enter 保存、Esc 取消 |
+| 编辑备注时，鼠标同时离开当前截图和备注窗口 | 自动保存备注并收起窗口 |
 | 悬停截图卡片 | 下方显示放大预览和完整备注，保持原比例，移开关闭 |
 | 放大预览显示长备注时，在图片上滚轮 | 滚动备注全文 |
 | 单击 / 双击图片 | 复制图片 / 打开查看 |
@@ -84,11 +77,11 @@ Ctrl+B 也常用于软件的加粗功能；本程序运行时优先响应截图�
 - 登录 Windows 后后台运行并保持收起，不抢焦点；重复的登录启动不会展开已有进程。手动再次运行同一 EXE 会临时展开或收起已有进程。
 - 便携版请完整解压到准备长期保留的目录。移动程序后手动运行一次，会更新已启用的启动路径；删除程序前可先取消「开机启动」。使用当前用户 Run 项，仅修改 Snapline 自身条目，不修改 Windows 截图设置。Windows 可能延后启动，详见 [Microsoft 说明](https://learn.microsoft.com/en-us/windows/win32/setupapi/run-and-runonce-registry-keys)。
 - 测试、演示及自定义数据目录运行不配置系统启动项；注册或保存失败会提示，保存失败时恢复原启动项与设置。
-- 顶部悬停按实际可见蓝线的物理像素范围判断，蓝线为 68×2 逻辑像素；只在显示蓝线的屏幕上触发。已对 100%–300% 缩放、多屏负坐标、顶部任务栏和离开线条重置做逻辑验证；实际触碰蓝线及顶部其他位置在本机显示器验证。多屏及混合 DPI 的其他电脑需实际使用确认，本轮实际截图仅在当前显示器验证。第三方应用的粘贴、拖放取决于对方支持的格式。
+- 顶部悬停按实际可见蓝线的物理像素范围判断，蓝线为 68×2 逻辑像素；只在显示蓝线的屏幕上触发。已对 100%–300% 缩放、多屏负坐标、顶部任务栏做逻辑验证；实际触碰蓝线及顶部其他位置在本机显示器验证。多屏及混合 DPI 的其他电脑需实际使用确认，本轮实际截图仅在当前显示器验证。第三方应用的粘贴、拖放取决于对方支持的格式。
 
 ## 编译和验证
 
-用 PowerShell 运行 build.ps1，调用 Windows 自带 .NET Framework 编译器，输出至 dist。源码为 src/Snapline.cs、src/RegionCapture.cs、src/Memo.cs、src/Shortcut.cs、src/ShortcutEditor.cs、src/Hover.cs、src/Startup.cs、src/Remark.cs 和 src/Integration.cs。本地构建，未做数字签名。
+用 PowerShell 运行 build.ps1，调用 Windows 自带 .NET Framework 编译器，输出至 dist。完整源码在 src 目录。本地构建，未做数字签名。
 
 tests/verify.ps1 验证便签持久化与保存失败处理、自定义快捷键录入、占用和保存失败回退、取消与重启恢复、截图存储、来源筛选、剪贴板输出格式、取消及过期结果、缓存编辑、自动收起、固定显示和快捷键占用。运行前退出本程序以释放全局快捷键。
 

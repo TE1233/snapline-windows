@@ -290,7 +290,7 @@ namespace Snapline
             try
             {
                 if (MessageBox.Show(this, "删除这张便签？内容将不会保留。", "删除便签", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
-                    store.RemoveNote(note);
+                    RemoveMemo(note);
             }
             catch (Exception ex) { store.Log("Delete memo", ex); Notify(ex.Message); }
             finally { dialogOpen = false; keepUntil = DateTime.Now.AddSeconds(3); lastInside = DateTime.Now; }
@@ -319,7 +319,7 @@ namespace Snapline
             System.Windows.Automation.AutomationProperties.SetName(tip, "便签全文");
             tip.Opened += delegate
             {
-                if (!expanded || dialogOpen || capturePending || dragging || shuttingDown || !store.Notes.Contains(note)) { tip.IsOpen = false; return; }
+                if (!HoverPreviewAllowed || !store.Notes.Contains(note)) { tip.IsOpen = false; return; }
                 CloseNotePreview(); CloseImagePreview(); if (helpTip != null) helpTip.IsOpen = false; noteTip = tip;
             };
             tip.Closed += delegate { if (Object.ReferenceEquals(noteTip, tip)) noteTip = null; lastInside = DateTime.Now; };
@@ -330,7 +330,7 @@ namespace Snapline
             const double width = 182, height = 153;
             double lean = new[] { -2.4, 1.6, -1.1, 2.2 }[index % 4];
             var swing = new RotateTransform(lean, width / 2, -15);
-            var grid = new Grid { Width = width, Height = height, Cursor = Cursors.Hand, RenderTransform = swing };
+            var grid = new Grid { Width = width, Height = height, Cursor = Cursors.Hand, RenderTransform = swing, Tag = note };
             System.Windows.Automation.AutomationProperties.SetName(grid, "便签 " + (note.Text.Length > 30 ? note.Text.Substring(0, 30) : note.Text));
             System.Windows.Automation.AutomationProperties.SetAutomationId(grid, "NoteCard-" + note.Id);
             grid.Children.Add(new Border { Background = MemoTheme.Paper(note.Color), BorderBrush = MemoTheme.Brush(MemoTheme.Edge(note.Color)), BorderThickness = new Thickness(0.6), CornerRadius = new CornerRadius(3),
@@ -353,16 +353,18 @@ namespace Snapline
             grid.Children.Add(new Line { X1 = width - 20, Y1 = height, X2 = width, Y2 = height - 20, Stroke = MemoTheme.Brush(MemoTheme.Edge(note.Color)), StrokeThickness = 0.7, IsHitTestVisible = false });
             AddHangingPeg(grid);
             var remove = MemoTheme.Button("×", "删除便签"); remove.Width = 21; remove.Height = 21; remove.FontSize = 16; remove.Padding = new Thickness(0); remove.Background = MemoTheme.Brush("#DDFFFDF5");
+            remove.Tag = "DeleteButton";
             remove.HorizontalAlignment = HorizontalAlignment.Right; remove.VerticalAlignment = VerticalAlignment.Top; remove.Margin = new Thickness(0, -9, -8, 0); remove.Opacity = 0; remove.IsHitTestVisible = false;
             remove.Click += delegate { DeleteNote(note); }; grid.Children.Add(remove);
             var menu = new ContextMenu(); menu.Items.Add(Item("编辑便签", delegate { EditNote(note, false); })); menu.Items.Add(Item("复制文字", delegate { CopyNote(note); }));
             menu.Items.Add(new Separator()); menu.Items.Add(Item("删除便签…", delegate { DeleteNote(note); }));
             menu.Opened += delegate { CloseNotePreview(); }; grid.ContextMenu = menu;
             grid.ToolTip = NotePopup(note, grid); ToolTipService.SetInitialShowDelay(grid, 280); ToolTipService.SetBetweenShowDelay(grid, 100); ToolTipService.SetShowDuration(grid, 60000);
+            RegisterHoverPreview(grid);
             var breeze = new DoubleAnimation(lean - 0.45, lean + 0.45, TimeSpan.FromSeconds(4.4 + index * 0.2)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut } };
-            Timeline.SetDesiredFrameRate(breeze, 24); swing.BeginAnimation(RotateTransform.AngleProperty, breeze);
-            grid.MouseEnter += delegate { remove.IsHitTestVisible = true; remove.Opacity = 1; swing.BeginAnimation(RotateTransform.AngleProperty, new DoubleAnimation(0, TimeSpan.FromMilliseconds(180))); };
-            grid.MouseLeave += delegate { remove.IsHitTestVisible = false; remove.Opacity = 0; swing.BeginAnimation(RotateTransform.AngleProperty, breeze); };
+            Timeline.SetDesiredFrameRate(breeze, 24); RegisterHangingMotion(grid, swing, breeze);
+            grid.MouseEnter += delegate { if (hoverEffectsPaused) return; remove.IsHitTestVisible = true; remove.Opacity = 1; SetHangingAnimation(swing, new DoubleAnimation(0, TimeSpan.FromMilliseconds(180))); };
+            grid.MouseLeave += delegate { CloseNotePreview(); if (hoverEffectsPaused) return; remove.IsHitTestVisible = false; remove.Opacity = 0; SetHangingAnimation(swing, breeze); };
             grid.PreviewMouseLeftButtonDown += delegate(object sender, MouseButtonEventArgs e) { CloseNotePreview(); if (e.ClickCount == 2) { e.Handled = true; EditNote(note, false); } };
             Place(grid, center - width / 2, y);
         }

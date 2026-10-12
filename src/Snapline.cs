@@ -1,4 +1,4 @@
-﻿// Snapline: a local screenshot shelf for Windows. MIT License.
+// Snapline: a local screenshot shelf for Windows. MIT License.
 // Independent Windows implementation inspired by Tendedero's interaction.
 using System;
 using System.Collections.Generic;
@@ -28,7 +28,7 @@ using Path = System.IO.Path;
 
 [assembly: System.Reflection.AssemblyTitle("Snapline - 截图晾台")]
 [assembly: System.Reflection.AssemblyDescription("Private, local screenshot shelf for Windows")]
-[assembly: System.Reflection.AssemblyVersion("0.5.4.0")]
+[assembly: System.Reflection.AssemblyVersion("0.5.8.0")]
 
 namespace Snapline
 {
@@ -251,8 +251,9 @@ namespace Snapline
         }
         internal void Remove(Shot item)
         {
-            Items.Remove(item);
-            Save();
+            int index = Items.IndexOf(item); if (index < 0) return;
+            Items.RemoveAt(index);
+            try { Save(); } catch { Items.Insert(index, item); throw; }
             DeleteCache(item);
             if (Changed != null) Changed();
         }
@@ -282,7 +283,15 @@ namespace Snapline
         readonly Store store;
         readonly bool noCapture, demo;
         readonly Canvas canvas = new Canvas();
+        readonly TranslateTransform shelfSlide = new TranslateTransform();
+        bool opening, collapsing, renderDeferred;
+        internal const double ShelfHeight = 270, HiddenShelfOffset = -286;
+        int transitionSerial;
+        internal bool Collapsing { get { return collapsing; } }
+        internal bool Opening { get { return opening; } }
+        internal double ShelfOffset { get { return shelfSlide.Y; } }
         FrameworkElement indicator;
+        FrameworkElement toastElement;
         readonly DispatcherTimer tick = new DispatcherTimer();
 
         readonly Dictionary<string, DateTime> pending = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
@@ -308,8 +317,8 @@ namespace Snapline
         Forms.Screen screen;
         bool expanded, pinned, dragging, dialogOpen, shuttingDown;
         DateTime keepUntil, hideUntil, lastInside;
-        readonly TopHoverGate hoverGate = new TopHoverGate();
         internal Func<IntPtr> ForegroundWindow = Native.GetForegroundWindow;
+        internal Func<Native.Point?> PointerPosition = delegate { Native.Point point; return Native.GetCursorPos(out point) ? (Native.Point?)point : null; };
 
         int page;
         double shelfWidth;
@@ -331,11 +340,13 @@ namespace Snapline
             ShowActivated = false;
             Topmost = true;
             Height = 4; Width = 1000;
-            Content = canvas;
+            canvas.RenderTransform = shelfSlide;
+            Content = new Grid { Children = { canvas, motionLayer } };
             FontFamily = new FontFamily("Microsoft YaHei UI");
             UseLayoutRounding = true;
             int knownCount = store.Items.Count + store.Notes.Count;
-            store.Changed = delegate { int count = store.Items.Count + store.Notes.Count; if (count > knownCount) page = 0; knownCount = count; Render(); };
+            store.Changed = delegate { int count = store.Items.Count + store.Notes.Count; bool deckChanged = count != knownCount; if (count > knownCount) page = 0; knownCount = count; Render(deckChanged); };
+            store.RemarkChanged = RefreshRemark;
             canvas.MouseWheel += delegate(object sender, MouseWheelEventArgs e) { if (expanded) { ChangePage(e.Delta < 0 ? 1 : -1); e.Handled = true; } };
             SourceInitialized += Initialize;
             Closing += delegate(object sender, System.ComponentModel.CancelEventArgs e) { if (memoEditor != null && !memoEditor.FlushChanges()) e.Cancel = true; if (remarkEditor != null && !remarkEditor.TrySave()) e.Cancel = true; };
@@ -416,10 +427,10 @@ namespace Snapline
             return IntPtr.Zero;
         }
 
-        static Forms.Screen ScreenUnderPointer()
+        Forms.Screen ScreenUnderPointer()
         {
-            Native.Point p; Native.GetCursorPos(out p);
-            return Forms.Screen.FromPoint(new Drawing.Point(p.X, p.Y));
+            var point = PointerPosition();
+            return point.HasValue ? Forms.Screen.FromPoint(new Drawing.Point(point.Value.X, point.Value.Y)) : (screen ?? Forms.Screen.PrimaryScreen);
         }
         double Dpi()
         {
@@ -432,15 +443,15 @@ namespace Snapline
             screen = target;
             var area = screen.WorkingArea;
             double scale = Dpi();
-            int height = (int)Math.Ceiling((open ? 270 : 4) * scale);
+            int height = (int)Math.Ceiling((open ? ShelfHeight : 4) * scale);
             Native.SetWindowPos(handle, new IntPtr(-1), area.Left, area.Top, area.Width, height, 0x0010);
             // A monitor move can change the WPF presentation source's DPI.
             scale = Dpi();
-            int updated = (int)Math.Ceiling((open ? 270 : 4) * scale);
+            int updated = (int)Math.Ceiling((open ? ShelfHeight : 4) * scale);
             if (height != updated) Native.SetWindowPos(handle, new IntPtr(-1), area.Left, area.Top, area.Width, updated, 0x0010);
             shelfWidth = area.Width / scale;
             canvas.Width = shelfWidth;
-            canvas.Height = open ? 270 : 4;
+            canvas.Height = open ? ShelfHeight : 4;
             if (changed) page = 0;
         }
         internal Drawing.Rectangle IndicatorHitBounds()
@@ -456,68 +467,96 @@ namespace Snapline
             if (foreground == IntPtr.Zero || foreground == handle || dialogOpen || dragging) return false;
             return HoverPolicy.Suppresses(foreground, (target ?? screen).Bounds);
         }
+        void TryRevealFromIndicator()
+        {
+            if (expanded || collapsing || shuttingDown || dialogOpen || dragging || helpReading || capturePending ||
+                FlyingCount > 0 || DateTime.Now < hideUntil) return;
+            var point = PointerPosition();
+            if (!point.HasValue || !IndicatorHitBounds().Contains(point.Value.X, point.Value.Y)) return;
+            if (!demo && Fullscreen(ScreenUnderPointer())) return;
+            Reveal();
+        }
         void Tick(object sender, EventArgs e)
         {
             if (shuttingDown) return;
             ProcessPending();
-            if (dialogOpen || dragging || helpReading || capturePending) { hoverGate.Reset(); return; }
-            Native.Point p; if (!Native.GetCursorPos(out p)) { hoverGate.Reset(); return; }
+            if (dialogOpen || dragging || helpReading || capturePending) return;
+            var point = PointerPosition(); if (!point.HasValue) return;
+            var p = point.Value;
             Forms.Screen under = Forms.Screen.FromPoint(new Drawing.Point(p.X, p.Y));
             DateTime now = DateTime.Now;
+            if (FlyingCount > 0) { lastInside = now; return; }
             if (!demo && Fullscreen(under))
             {
-                hoverGate.Reset();
-                if (expanded && screen.DeviceName == under.DeviceName) Collapse(false);
+                if (expanded && screen.DeviceName == under.DeviceName) Collapse(false, false);
                 return;
             }
             if ((imageTip != null && imageTip.IsOpen) || (noteTip != null && noteTip.IsOpen)) { lastInside = now; return; }
-            if (now < hideUntil) hoverGate.Reset();
-            else if (!expanded && hoverGate.ObserveLine(screen.DeviceName, IndicatorHitBounds(), p.X, p.Y, now)) Reveal();
+            if (collapsing) return;
+            if (!expanded) TryRevealFromIndicator();
             bool inside = expanded && p.X >= screen.WorkingArea.Left && p.X < screen.WorkingArea.Right &&
                 p.Y >= screen.WorkingArea.Top && p.Y < screen.WorkingArea.Top + 266 * Dpi();
             if (inside) lastInside = now;
             if (expanded && !pinned && now > keepUntil && (now - lastInside).TotalMilliseconds > 700) Collapse(false);
-            if (toast != "" && now > toastUntil) { toast = ""; Render(); }
+            if (toast != "" && now > toastUntil) { toast = ""; UpdateToast(); }
         }
         internal void Reveal()
         {
             bool was = expanded;
+            bool reversing = collapsing;
+            double offset = shelfSlide.Y;
+            int serial = ++transitionSerial; collapsing = false;
+            shelfSlide.BeginAnimation(TranslateTransform.YProperty, null);
             var target = ScreenUnderPointer();
             bool moved = screen == null || target.DeviceName != screen.DeviceName;
+            opening = !was || reversing || moved || Math.Abs(offset) > .1;
+            shelfSlide.Y = !was || moved ? HiddenShelfOffset : offset;
+            canvas.BeginAnimation(UIElement.OpacityProperty, null); canvas.Opacity = 1;
             expanded = true;
             if (!was || moved) Position(true, target);
-            if (Fullscreen() && !demo) { Collapse(false); return; }
+            if (Fullscreen() && !demo) { Collapse(false, false); return; }
             lastInside = DateTime.Now;
-            if (!was || moved) Render();
-            if (!was)
+            if (!was || moved || renderDeferred) Render();
+            if (opening)
             {
-                canvas.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(180)));
-                var slide = new TranslateTransform();
-                canvas.RenderTransform = slide;
-                slide.BeginAnimation(TranslateTransform.YProperty,
-                    new DoubleAnimation(-20, 0, TimeSpan.FromMilliseconds(260)) { EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut } });
+                var slide = new DoubleAnimation(shelfSlide.Y, 0, TimeSpan.FromMilliseconds(300))
+                    { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
+                slide.Completed += delegate { if (serial == transitionSerial && !shuttingDown) opening = false; };
+                shelfSlide.BeginAnimation(TranslateTransform.YProperty, slide);
             }
         }
 
-        void Collapse(bool manual)
+        void Collapse(bool manual, bool animate = true)
         {
-            expanded = false;
             if (manual) { pinned = false; hideUntil = DateTime.Now.AddSeconds(1); }
-            hoverGate.Reset();
-            Position(false, screen);
+            CloseImagePreview(); CloseNotePreview(); if (helpTip != null) helpTip.IsOpen = false;
+            if (collapsing && animate) return;
+            int serial = ++transitionSerial;
+            opening = false;
+            Action finish = delegate {
+                if (serial != transitionSerial || shuttingDown) return;
+                collapsing = false; expanded = false;
+                Position(false, screen);
+                shelfSlide.BeginAnimation(TranslateTransform.YProperty, null); shelfSlide.Y = 0;
+                Render();
+            };
             canvas.BeginAnimation(UIElement.OpacityProperty, null);
             canvas.Opacity = 1;
-            canvas.RenderTransform = Transform.Identity;
-            Render();
+            if (!expanded || !animate) { finish(); return; }
+            collapsing = true;
+            var slide = new DoubleAnimation(shelfSlide.Y, HiddenShelfOffset, TimeSpan.FromMilliseconds(250))
+                { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn } };
+            slide.Completed += delegate { finish(); };
+            shelfSlide.BeginAnimation(TranslateTransform.YProperty, slide);
         }
         void Toggle()
         {
-            if (expanded) Collapse(true);
+            if (expanded && !collapsing) Collapse(true);
             else { pinned = true; Reveal(); }
         }
         internal void ToggleFromTray()
         {
-            if (expanded) Collapse(true);
+            if (expanded && !collapsing) Collapse(true);
             else
             {
                 pinned = false;
@@ -538,7 +577,7 @@ namespace Snapline
             toast = message.Length > 80 ? message.Substring(0, 80) : message;
             toastUntil = DateTime.Now.AddSeconds(5);
             keepUntil = toastUntil;
-            Reveal(); Render();
+            Reveal(); UpdateToast();
         }
         internal void RegisterCaptureShortcut()
         {
@@ -566,9 +605,10 @@ namespace Snapline
         internal void StartCapture(bool collect, uint triggerKey = 0)
         {
             if (capturePending || shuttingDown) return;
+            CloseFallingPapers();
             CloseImagePreview(); CloseNotePreview();
             if (helpTip != null) helpTip.IsOpen = false;
-            pinned = false; Collapse(true);
+            pinned = false; Collapse(true, false);
             canvas.Visibility = Visibility.Hidden;
             capturePending = true; captureSerial++;
             collectCapture = collect; captureTriggerKey = triggerKey;
@@ -607,7 +647,7 @@ namespace Snapline
             if (collect && !noCapture)
             {
                 store.Add(image, "晾台截图");
-                Notify(copied ? "截图已挂上并复制。点击图片下方「＋ 添加备注」记一下用途。" : "截图已挂上晾台；剪贴板暂时被占用，可单击图片重试复制。");
+                Notify(copied ? "截图已挂上并复制。点击图片下方「添加备注」记一下用途。" : "截图已挂上晾台；剪贴板暂时被占用，可单击图片重试复制。");
             }
             else Notify(copied ? (ShortcutCollects ? "截图已复制。自动挂上晾台请使用 " + CaptureShortcutLabel + "。" :
                 "截图已复制。自动挂上请在托盘选择 Ctrl+B 或自定义快捷键。") : "剪贴板被占用，截图未复制，请重试。");
@@ -622,7 +662,7 @@ namespace Snapline
             if (!CaptureHotkeyRegistered && store.Settings.CaptureShortcut != "None")
                 content.Children.Add(new TextBlock { Text = CaptureShortcutLabel + " 已被占用，可在托盘更换", FontSize = 10, Foreground = Brush("#FF9C6A3B"), Margin = new Thickness(0, 0, 0, 7) });
             AddHelpRow(content, "卡片截图按钮", "只复制，不自动挂上晾台");
-            AddHelpRow(content, "触碰顶部蓝线", "在线条上停留约 0.2 秒展开");
+            AddHelpRow(content, "触碰顶部蓝线", "碰到线条立即开始展开");
             AddHelpRow(content, "图片下方小纸条", "添加或修改截图用途备注");
             AddHelpRow(content, "Ctrl + Alt + T", "固定展开 / 收起");
             AddHelpRow(content, "＋ 便签", "随手记录，自动保存到本机");
@@ -717,7 +757,7 @@ namespace Snapline
             dialogOpen = true;
             try
             {
-                Forms.MessageBox.Show("截图晾台 Snapline 0.5.4\n\n" + CaptureShortcutLabel + "：框选截图（需快捷键可用）。\n图片右侧「操作提示」：悬停查看说明，点击内部按钮仅截图并复制。\nWin + Shift + S 和其他软件截图不会自动加入。\nCtrl + Alt + T：展开 / 收起，展开后保持显示。\n双击托盘图标：临时展开，离开后自动收起。\n托盘「固定显示」：勾选保持显示，取消后恢复自动收起。\n托盘「开机启动」：首次运行自动启用，取消后记住；登录 Windows 后收起运行。\n鼠标停在顶部中央蓝线上约 0.2 秒：临时展开。\n图片下方「＋ 添加备注」或小纸条：记录截图用途；Enter 保存，Esc 取消。\n单击图片：复制。双击：查看。\n拖出：复制为文件。按 Shift 拖到文件夹：移动。\n长按图片：用画图编辑。右键：更多操作。\n\n默认 Ctrl+B 或自定义快捷键发起的框选截图会自动加入。微信截图、普通复制图片和外部截图文件夹均不自动收集。\n最多保留 60 张，超过后清理最早的应用副本。\n完全本地运行，不联网、不上传、不修改系统截图设置。", "截图晾台", Forms.MessageBoxButtons.OK, Forms.MessageBoxIcon.Information);
+                Forms.MessageBox.Show("截图晾台 Snapline 0.5.8\n\n" + CaptureShortcutLabel + "：框选截图（需快捷键可用）。\n图片右侧「操作提示」：悬停查看说明，点击内部按钮仅截图并复制。\nWin + Shift + S 和其他软件截图不会自动加入。\nCtrl + Alt + T：展开 / 收起，展开后保持显示。\n双击托盘图标：临时展开，离开后自动收起。\n托盘「固定显示」：勾选保持显示，取消后恢复自动收起。\n托盘「开机启动」：首次运行自动启用，取消后记住；登录 Windows 后收起运行。\n鼠标触碰顶部中央蓝线：立即开始展开。\n图片下方「添加备注」或小纸条：记录截图用途；Enter 保存，Esc 取消。\n单击图片：复制。双击：查看。\n拖出：复制为文件。按 Shift 拖到文件夹：移动。\n长按图片：用画图编辑。右键：更多操作。\n\n默认 Ctrl+B 或自定义快捷键发起的框选截图会自动加入。微信截图、普通复制图片和外部截图文件夹均不自动收集。\n最多保留 60 张，超过后清理最早的应用副本。\n完全本地运行，不联网、不上传、不修改系统截图设置。", "截图晾台", Forms.MessageBoxButtons.OK, Forms.MessageBoxIcon.Information);
             }
             finally { dialogOpen = false; }
         }
@@ -852,7 +892,7 @@ namespace Snapline
             menu.Items.Add(Item("另存为…", delegate { SaveAs(shot); }));
             menu.Items.Add(Item("在文件夹中显示", delegate { Process.Start("explorer.exe", "/select,\"" + store.FullPath(shot) + "\""); }));
             menu.Items.Add(new Separator());
-            menu.Items.Add(Item("从晾台移除", delegate { store.Remove(shot); }));
+            menu.Items.Add(Item("从晾台移除", delegate { RemoveShot(shot); }));
             menu.Opened += delegate { CloseImagePreview(); dialogOpen = true; };
             menu.Closed += delegate { dialogOpen = false; lastInside = DateTime.Now; };
             return menu;
@@ -923,15 +963,20 @@ namespace Snapline
             if (next == page) return;
             page = next; lastInside = DateTime.Now; Render();
         }
-        internal void Render()
+        internal void Render(bool force = false)
         {
+            if (collapsing || (remarkEditor != null && !force)) { renderDeferred = true; return; }
+            renderDeferred = false;
             CloseImagePreview(); CloseNotePreview();
             if (helpTip != null) helpTip.IsOpen = false;
-            canvas.Children.Clear(); indicator = null;
+            ClearHoverEffects();
+            canvas.Children.Clear(); indicator = null; toastElement = null;
+            if (!expanded) motionLayer.Children.Clear();
             if (!expanded)
             {
-                var mark = new Border { Width = TopHoverGate.IndicatorWidth, Height = TopHoverGate.IndicatorHeight, CornerRadius = new CornerRadius(1), Background = Brush("#D671C6FA"), ToolTip = "鼠标触碰这条蓝线稍停即可展开 · 图片旁「操作提示」查看说明" };
+                var mark = new Border { Width = TopHoverGate.IndicatorWidth, Height = TopHoverGate.IndicatorHeight, CornerRadius = new CornerRadius(1), Background = Brush("#D671C6FA"), ToolTip = "鼠标触碰这条蓝线即可展开 · 图片旁「操作提示」查看说明" };
                 indicator = mark;
+                mark.MouseEnter += delegate { TryRevealFromIndicator(); };
                 Place(mark, Math.Max(0, (shelfWidth - TopHoverGate.IndicatorWidth) / 2), 0);
                 return;
             }
@@ -985,6 +1030,13 @@ namespace Snapline
             }
             double helpCenter = HangingCenter(shown.Length, shown.Length);
             MakeHelpCard(helpCenter, RopeY(helpCenter) + 15, shown.Length);
+            UpdateToast();
+        }
+        void UpdateToast()
+        {
+            if (toastElement != null) canvas.Children.Remove(toastElement);
+            toastElement = null;
+            if (!expanded) return;
             if (toast != "")
             {
                 var note = Text(toast, 11, "#FF525F6C");
@@ -993,9 +1045,10 @@ namespace Snapline
                     Child = note, Padding = new Thickness(12, 6, 12, 6),
                     CornerRadius = new CornerRadius(12), Background = Brush("#EAF7F8FA"),
                     BorderBrush = Brush("#88D3D7DE"), BorderThickness = new Thickness(0.5),
-                    IsHitTestVisible = false
+                    IsHitTestVisible = false, Tag = "ShelfFeedback"
                 };
                 feedback.Measure(new System.Windows.Size(Double.PositiveInfinity, Double.PositiveInfinity));
+                toastElement = feedback;
                 Place(feedback, (shelfWidth - feedback.DesiredSize.Width) / 2, 242);
             }
         }
@@ -1033,6 +1086,7 @@ namespace Snapline
             helpTip = HelpPopup();
             helpTip.PlacementTarget = grid;
             grid.ToolTip = helpTip;
+            RegisterHoverPreview(grid);
             ToolTipService.SetInitialShowDelay(grid, 220);
             ToolTipService.SetShowDuration(grid, 60000);
             var breeze = new DoubleAnimation(lean - 0.6, lean + 0.6, TimeSpan.FromSeconds(3.8))
@@ -1041,17 +1095,17 @@ namespace Snapline
                 EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
             };
             Timeline.SetDesiredFrameRate(breeze, 24);
-            swing.BeginAnimation(RotateTransform.AngleProperty, breeze);
-            grid.MouseEnter += delegate { swing.BeginAnimation(RotateTransform.AngleProperty, new DoubleAnimation(0, TimeSpan.FromMilliseconds(180))); };
-            grid.MouseLeave += delegate { swing.BeginAnimation(RotateTransform.AngleProperty, breeze); };
-            grid.MouseLeftButtonUp += delegate(object sender, MouseButtonEventArgs e) { e.Handled = true; helpTip.IsOpen = !helpTip.IsOpen; };
+            RegisterHangingMotion(grid, swing, breeze);
+            grid.MouseEnter += delegate { if (!hoverEffectsPaused) SetHangingAnimation(swing, new DoubleAnimation(0, TimeSpan.FromMilliseconds(180))); };
+            grid.MouseLeave += delegate { if (!hoverEffectsPaused) SetHangingAnimation(swing, breeze); };
+            grid.MouseLeftButtonUp += delegate(object sender, MouseButtonEventArgs e) { e.Handled = true; if (HoverPreviewAllowed) helpTip.IsOpen = !helpTip.IsOpen; };
             Place(grid, center - width / 2, y);
         }
         void AddHangingPeg(Grid grid)
         {
             var pin = new Border
             {
-                Width = 6, Height = 22, CornerRadius = new CornerRadius(2),
+                Width = 6, Height = 22, CornerRadius = new CornerRadius(2), Tag = "HangingPeg",
                 Background = new LinearGradientBrush(Color.FromRgb(236, 238, 243), Color.FromRgb(170, 175, 190), 0),
                 BorderBrush = Brush("#D8FFFFFF"), BorderThickness = new Thickness(0.5),
                 VerticalAlignment = VerticalAlignment.Top, HorizontalAlignment = HorizontalAlignment.Center,
@@ -1061,7 +1115,7 @@ namespace Snapline
             grid.Children.Add(pin);
             grid.Children.Add(new Border
             {
-                Width = 1, Height = 14, Background = Brush("#668A909D"),
+                Width = 1, Height = 14, Background = Brush("#668A909D"), Tag = "HangingPeg",
                 VerticalAlignment = VerticalAlignment.Top, HorizontalAlignment = HorizontalAlignment.Center,
                 Margin = new Thickness(0, -16, 0, 0), IsHitTestVisible = false
             });
@@ -1084,6 +1138,7 @@ namespace Snapline
             double bodyWidth = Math.Max(180, width);
             var preview = new Image { Width = width, Height = height, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Center };
             var content = new StackPanel { Width = bodyWidth };
+            ScrollViewer remarkScroll = null;
             var title = Text("放大预览", 12, "#FF387DA6");
             title.Margin = new Thickness(0, 0, 0, 8); content.Children.Add(title);
             content.Children.Add(new Border { Child = preview, Background = Brush("#FFF0F4F8"), CornerRadius = new CornerRadius(4), ClipToBounds = true });
@@ -1094,10 +1149,9 @@ namespace Snapline
                 AutomationProperties.SetAutomationId(remarkText, "PreviewRemark");
                 var scroll = new ScrollViewer { Content = remarkText, MaxHeight = remarkBudget, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                     HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+                remarkScroll = scroll;
                 content.Children.Add(new Border { Child = scroll, Padding = new Thickness(10, 8, 10, 8), Margin = new Thickness(0, 9, 0, 0),
                     CornerRadius = new CornerRadius(5), Background = Brush("#FFFFF7DD"), BorderBrush = Brush("#FFEBDDB6"), BorderThickness = new Thickness(1) });
-                target.PreviewMouseWheel += delegate(object sender, MouseWheelEventArgs e)
-                { if (imageTip != null && imageTip.IsOpen && imageTip.PlacementTarget == target) { scroll.ScrollToVerticalOffset(scroll.VerticalOffset - e.Delta / 3.0); e.Handled = true; } };
             }
             content.Children.Add(new TextBlock { Text = "单击复制 · 双击查看 · 拖出图片" + (remarkBudget > 0 ? " · 滚轮查看长备注" : ""), FontSize = 11,
                 Foreground = Brush("#FF82909B"), Margin = new Thickness(0, 8, 0, 0), TextWrapping = TextWrapping.Wrap });
@@ -1107,12 +1161,13 @@ namespace Snapline
                     Background = Brush("#FFF9FCFF"), BorderBrush = Brush("#FFC1E4F8"), BorderThickness = new Thickness(1) },
                 Background = Brushes.Transparent, BorderThickness = new Thickness(0), Padding = new Thickness(0),
                 HasDropShadow = true, IsHitTestVisible = false, FontFamily = FontFamily,
+                Tag = remarkScroll,
                 Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom, PlacementTarget = target,
                 HorizontalOffset = (target.Width - bodyWidth - 22) / 2, VerticalOffset = 10
             };
             tip.Opened += delegate
             {
-                if (!expanded || capturePending || dragging || dialogOpen || shuttingDown ||
+                if (!HoverPreviewAllowed ||
                     Mouse.LeftButton == MouseButtonState.Pressed || !store.Items.Contains(shot)) { tip.IsOpen = false; return; }
                 try
                 {
@@ -1138,9 +1193,14 @@ namespace Snapline
             double width = Math.Max(70, imageWidth * scale) + 7;
             double height = Math.Max(54, imageHeight * scale) + 7;
             double lean = new[] { -2.2, 1.4, -1.1, 2.0, -0.6 }[index % 5];
-            double cardWidth = Math.Max(142, width);
+            double cardWidth = width;
             var swing = new RotateTransform(lean, cardWidth / 2, -15);
-            var card = new Grid { Width = cardWidth, Height = height + 51, RenderTransform = swing };
+            var card = new Grid { Width = cardWidth, Height = height + RemarkStripHeight, RenderTransform = swing, Tag = shot };
+            card.Children.Add(new Border
+            {
+                CornerRadius = new CornerRadius(5), Background = Brush("#E8F5FF"), IsHitTestVisible = false,
+                Effect = new DropShadowEffect { Color = MemoTheme.Hex("#354155"), BlurRadius = 10, Opacity = 0.18, ShadowDepth = 3 }
+            });
             var grid = new Grid
             {
                 Width = width, Height = height, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top,
@@ -1149,16 +1209,21 @@ namespace Snapline
             AutomationProperties.SetName(grid, "悬挂图片 " + shot.Label);
             AutomationProperties.SetAutomationId(grid, "ShotCard-" + shot.File);
             grid.ToolTip = ImagePopup(shot, grid);
+            RegisterHoverPreview(grid);
             ToolTipService.SetInitialShowDelay(grid, 300);
             ToolTipService.SetBetweenShowDelay(grid, 100);
             ToolTipService.SetShowDuration(grid, 60000);
             grid.PreviewMouseDown += delegate { CloseImagePreview(); };
+            grid.PreviewMouseWheel += delegate(object sender, MouseWheelEventArgs e) {
+                if (imageTip == null || !imageTip.IsOpen || imageTip.PlacementTarget != grid) return;
+                var scroll = imageTip.Tag as ScrollViewer;
+                if (scroll != null) { scroll.ScrollToVerticalOffset(scroll.VerticalOffset - e.Delta / 3.0); e.Handled = true; }
+            };
             var frame = new Border
             {
-                CornerRadius = new CornerRadius(5), Background = Brush("#E9F7F8FB"),
-                BorderBrush = Brush("#C9FFFFFF"), BorderThickness = new Thickness(1),
-                Padding = new Thickness(2.5),
-                Effect = new DropShadowEffect { BlurRadius = 10, Opacity = 0.18, ShadowDepth = 3 }
+                CornerRadius = new CornerRadius(5, 5, 0, 0), Background = Brush("#F7F8FB"),
+                BorderBrush = Brush("#C6E2F5"), BorderThickness = new Thickness(1, 1, 1, 0),
+                Padding = new Thickness(2.5)
             };
             frame.Child = new Border
             {
@@ -1173,10 +1238,10 @@ namespace Snapline
                 Background = Brush("#C948505F"), Foreground = Brushes.White, BorderThickness = new Thickness(0),
                 HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top,
                 Margin = new Thickness(0, 3, 3, 0), Focusable = false, ToolTip = "移除应用副本",
-                Opacity = 0, IsHitTestVisible = false
+                Opacity = 0, IsHitTestVisible = false, Tag = "DeleteButton"
             };
             AutomationProperties.SetName(remove, "移除 " + shot.Label);
-            remove.PreviewMouseDown += delegate(object sender, MouseButtonEventArgs e) { e.Handled = true; store.Remove(shot); };
+            remove.PreviewMouseDown += delegate(object sender, MouseButtonEventArgs e) { e.Handled = true; RemoveShot(shot); };
             grid.Children.Add(remove);
             var breeze = new DoubleAnimation(lean - 0.65, lean + 0.65, TimeSpan.FromSeconds(3.4 + (index % 3) * 0.6))
             {
@@ -1184,20 +1249,23 @@ namespace Snapline
                 EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
             };
             Timeline.SetDesiredFrameRate(breeze, 24);
-            swing.BeginAnimation(RotateTransform.AngleProperty, breeze);
-            grid.MouseEnter += delegate
+            RegisterHangingMotion(card, swing, breeze);
+            card.MouseEnter += delegate
             {
+                if (hoverEffectsPaused) return;
                 remove.IsHitTestVisible = true;
                 remove.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(1, TimeSpan.FromMilliseconds(120)));
-                swing.BeginAnimation(RotateTransform.AngleProperty, new DoubleAnimation(0, TimeSpan.FromMilliseconds(180)));
+                SetHangingAnimation(swing, new DoubleAnimation(0, TimeSpan.FromMilliseconds(180)));
             };
-            grid.MouseLeave += delegate
+            grid.MouseLeave += delegate { CloseImagePreview(); };
+            card.MouseLeave += delegate
             {
                 CloseImagePreview(); CloseNotePreview();
+                if (hoverEffectsPaused) return;
                 remove.IsHitTestVisible = false;
                 remove.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(0, TimeSpan.FromMilliseconds(150)));
                 Timeline.SetDesiredFrameRate(breeze, 24);
-            swing.BeginAnimation(RotateTransform.AngleProperty, breeze);
+                SetHangingAnimation(swing, breeze);
             };
             grid.ContextMenu = ShotMenu(shot);
             bool down = false, moved = false, held = false;
@@ -1251,6 +1319,9 @@ namespace Snapline
         void Cleanup(object sender, EventArgs e)
         {
             shuttingDown = true;
+            store.RemarkChanged = null;
+            transitionSerial++; shelfSlide.BeginAnimation(TranslateTransform.YProperty, null);
+            ClearHoverEffects(); CloseFallingPapers();
             tick.Stop(); captureDelay.Stop();
             CloseImagePreview(); CloseNotePreview();
             if (helpTip != null) helpTip.IsOpen = false;
@@ -1282,6 +1353,7 @@ namespace Snapline
                 if (args.Contains("--hover-test")) return HoverTests.Run(root);
                 if (args.Contains("--startup-test")) return StartupTests.Run(root);
                 if (args.Contains("--remark-test")) return RemarkTests.Run(root);
+                if (args.Contains("--interaction-test")) return InteractionTests.Run(root);
                 bool fresh;
                 using (var mutex = new Mutex(true, "Local\\Snapline-" + BitConverter.ToString(SHA256.Create().ComputeHash(Encoding.UTF8.GetBytes(Path.GetFullPath(root)))).Replace("-", "").Substring(0, 20), out fresh))
                 {

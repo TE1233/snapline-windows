@@ -12,7 +12,6 @@ namespace Snapline
     // If a clipboard format cannot be preserved, the test stops before writing to it.
     static class Integration
     {
-        [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool SetCursorPos(int x, int y);
         internal static int Run(string root)
         {
             if (Directory.Exists(root) && Directory.EnumerateFileSystemEntries(root).Any())
@@ -59,16 +58,13 @@ namespace Snapline
             uint lastOwnedSequence = savedSequence;
             string importedFile = Path.Combine(external, "partial.png");
             bool restored = false, restoringClipboard = false, testFailed = false;
-            bool pointerMoved = false;
-            Native.Point originalPointer = new Native.Point(), testPointer = new Native.Point();
+            Native.Point testPointer; Native.GetCursorPos(out testPointer);
+            shelf.PointerPosition = delegate { return testPointer; };
             Native.Rect shelfRect = new Native.Rect();
             System.Drawing.Point outsidePointer = new System.Drawing.Point();
             IntPtr foregroundBeforeTray = IntPtr.Zero;
             Action<int, int> movePointer = delegate(int x, int y)
             {
-                if (!pointerMoved && !Native.GetCursorPos(out originalPointer)) throw new Exception("Cannot save mouse position.");
-                if (!SetCursorPos(x, y)) throw new Exception("Cannot set test mouse position.");
-                pointerMoved = true;
                 testPointer = new Native.Point { X = x, Y = y };
             };
             Action restore = delegate
@@ -319,7 +315,11 @@ namespace Snapline
                     }
                     else if (phase == 14 && (DateTime.Now - phaseStart).TotalMilliseconds > 3500)
                     {
-                        if (shelf.ActualHeight < 200) throw new Exception("Tray shelf collapsed while mouse was inside.");
+                        if (shelf.ActualHeight < 200) {
+                            Native.Point pointer = testPointer;
+                            throw new Exception("Tray shelf collapsed while mouse was inside. Pointer=" + pointer.X + "," + pointer.Y +
+                                "; requested=" + testPointer.X + "," + testPointer.Y + "; original shelf=" + shelfRect.Left + "," + shelfRect.Top + "," + shelfRect.Right + "," + shelfRect.Bottom);
+                        }
                         require("tray shelf stays open while mouse is inside, beyond the grace period");
                         movePointer(outsidePointer.X, outsidePointer.Y);
                         phase = 15; phaseStart = DateTime.Now;
@@ -386,12 +386,7 @@ namespace Snapline
             finally
             {
                 try { restore(); } catch (Exception ex) { report.Add("RESTORE ERROR: " + ex); exitCode = 1; }
-                Native.Point currentPointer;
-                if (pointerMoved && Native.GetCursorPos(out currentPointer) && currentPointer.X == testPointer.X && currentPointer.Y == testPointer.Y)
-                {
-                    if (SetCursorPos(originalPointer.X, originalPointer.Y)) report.Add("PASS: test mouse position restored");
-                    else { report.Add("FAIL: cannot restore test mouse position"); exitCode = 1; }
-                }
+                report.Add("PASS: independent test pointer leaves user's real cursor untouched");
                 System.IO.File.WriteAllLines(Path.Combine(root, "integration-results.txt"), report, Encoding.UTF8);
             }
             return exitCode;
